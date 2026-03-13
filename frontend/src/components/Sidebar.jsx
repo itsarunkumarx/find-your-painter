@@ -1,0 +1,254 @@
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+import { useTranslation } from 'react-i18next';
+import { motion, AnimatePresence } from 'framer-motion';
+import axios from 'axios';
+import { io } from 'socket.io-client';
+import {
+    FaHome, FaCalendarAlt, FaUser, FaSignOutAlt,
+    FaBars, FaTimes, FaTachometerAlt, FaChartPie,
+    FaUsers, FaShieldAlt, FaSearch, FaComments,
+    FaBell, FaHeart, FaImages, FaRupeeSign,
+    FaChartBar, FaHeadset, FaInbox, FaStar, FaUserTie, FaMusic
+} from 'react-icons/fa';
+
+const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const { t } = useTranslation();
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [unreadNotifs, setUnreadNotifs] = useState(0);
+
+    useEffect(() => {
+        if (!user) return;
+        const fetchCounts = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const h = { headers: { Authorization: `Bearer ${token}` } };
+                const [chatRes, notifRes] = await Promise.all([
+                    axios.get(`${import.meta.env.VITE_API_URL}/api/chat/unread-count`, h),
+                    axios.get(`${import.meta.env.VITE_API_URL}/api/notifications/unread-count`, h),
+                ]);
+                setUnreadCount(chatRes.data.total || 0);
+                setUnreadNotifs(notifRes.data.count || 0);
+            } catch (_) { }
+        };
+        fetchCounts();
+
+        const socket = io(import.meta.env.VITE_API_URL);
+        socket.on('connect', () => {
+            socket.emit('user_online', user._id);
+        });
+
+        socket.on('new_message', (message) => {
+            // Only increment if message is not from current user
+            if (message.sender._id !== user._id) {
+                setUnreadCount(prev => prev + 1);
+            }
+        });
+
+        socket.on('messages_read', () => {
+            // Refetch count to be accurate when messages are read
+            fetchCounts();
+        });
+
+        socket.on('new_notification', () => {
+            setUnreadNotifs(prev => prev + 1);
+        });
+
+        return () => {
+            socket.disconnect();
+        };
+    }, [user]);
+
+    const makeLink = (path, icon, label, badge = null) => ({ path, icon, label, badge: badge > 0 ? badge : null });
+
+    const roleLinks = {
+        user: [
+            makeLink('/user-dashboard', <FaHome />, t('dashboard')),
+            makeLink('/explore', <FaSearch />, 'Explore Painters'),
+            makeLink('/my-bookings', <FaCalendarAlt />, 'My Bookings'),
+            makeLink('/saved-painters', <FaHeart />, 'Saved Painters'),
+            makeLink('/messages', <FaComments />, 'Messages', unreadCount),
+            makeLink('/notifications', <FaBell />, 'Notifications', unreadNotifs),
+            makeLink('/raise-complaint', <FaHeadset />, 'Support'),
+            makeLink('/audio-protocols', <FaMusic />, 'Audio Protocols'),
+            makeLink('/profile-settings', <FaUser />, t('profile')),
+        ],
+        worker: [
+            makeLink('/worker-dashboard', <FaTachometerAlt />, t('dashboard')),
+            makeLink('/worker-jobs', <FaInbox />, 'Active Jobs'),
+            makeLink('/messages', <FaComments />, 'Messages', unreadCount),
+            makeLink('/my-portfolio', <FaImages />, 'My Portfolio'),
+            makeLink('/earnings', <FaRupeeSign />, 'Earnings'),
+            makeLink('/worker-verification', <FaShieldAlt />, 'Verification'),
+            makeLink('/notifications', <FaBell />, 'Notifications', unreadNotifs),
+            makeLink('/raise-complaint', <FaHeadset />, 'Support'),
+            makeLink('/audio-protocols', <FaMusic />, 'Audio Protocols'),
+            makeLink('/worker-profile', <FaUser />, t('profile')),
+        ],
+        admin: [
+            makeLink('/admin-dashboard', <FaChartPie />, 'Overview'),
+            makeLink('/admin-users', <FaUsers />, 'Manage Users'),
+            makeLink('/admin-workers', <FaUserTie />, 'Manage Workers'),
+            makeLink('/admin-analytics', <FaChartBar />, 'Analytics'),
+            makeLink('/admin-notifications', <FaBell />, 'Broadcast'),
+            makeLink('/admin-support', <FaHeadset />, 'Support Centre'),
+            makeLink('/messages', <FaComments />, 'Messages', unreadCount),
+            makeLink('/notifications', <FaBell />, 'Notifications', unreadNotifs),
+            makeLink('/audio-protocols', <FaMusic />, 'Audio Protocols'),
+            makeLink('/admin-profile', <FaUser />, t('profile')),
+        ],
+    };
+
+    const links = roleLinks[user?.role || 'user'] || [];
+
+    const handleLogout = () => {
+        logout();
+        navigate('/roles');
+    };
+
+    return (
+        <>
+            {/* Mobile Backdrop Overlay */}
+            <AnimatePresence>
+                {isMobile && isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setIsOpen(false)}
+                        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 lg:hidden"
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* Sidebar Container */}
+            <motion.aside
+                initial={false}
+                animate={{
+                    // Always 280 on desktop, 280 on mobile (when open)
+                    width: 280,
+                    x: (isMobile && !isOpen) ? -280 : 0
+                }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="fixed left-0 top-0 h-screen bg-[var(--bg-base)] border-r border-[var(--glass-border)] z-[60] shadow-2xl overflow-hidden transition-colors duration-500"
+            >
+                <div className="flex flex-col h-full">
+                    {/* Brand Signal & Integrated Toggle */}
+                    <div className="flex items-center justify-between px-6 py-8 mb-6 border-b border-[var(--glass-border)] bg-[var(--bg-highlight)]/30">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-[var(--text-main)] rounded-xl flex items-center justify-center text-royal-gold shadow-xl shrink-0">
+                                <FaStar size={20} />
+                            </div>
+                            <AnimatePresence>
+                                {isOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -10 }}
+                                        className="flex flex-col whitespace-nowrap"
+                                    >
+                                        <span className="text-sm font-black text-[var(--text-main)] tracking-tighter leading-none uppercase">Painter<span className="text-royal-gold">Pro</span></span>
+                                        <span className="text-[8px] font-black text-royal-gold uppercase tracking-[0.4em] mt-1">Command Hub</span>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
+                        {/* Unified Toggle Button (Mobile Only) */}
+                        {isMobile && (
+                            <button
+                                onClick={() => setIsOpen(!isOpen)}
+                                className="p-2 hover:bg-[var(--bg-highlight)] rounded-xl text-[var(--text-muted)] hover:text-royal-gold transition-colors"
+                            >
+                                {isOpen ? <FaTimes size={18} /> : <FaBars size={18} />}
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Navigation Cluster */}
+                    <nav className="flex-1 space-y-2 px-4 py-4 overflow-y-auto">
+                        {links.map((link) => (
+                            <Link
+                                key={link.path + link.label}
+                                to={link.path}
+                                title={!isOpen ? link.label : ""}
+                                className={`flex items-center gap-4 px-4 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all group relative ${location.pathname === link.path
+                                    ? 'bg-[var(--text-main)] text-[var(--bg-base)] shadow-2xl shadow-royal-gold/20 font-bold'
+                                    : 'text-[var(--text-main)] hover:bg-[var(--bg-highlight)] hover:text-[var(--text-main)]'
+                                    }`}
+                            >
+                                <div className={`${location.pathname === link.path ? 'text-royal-gold' : 'text-[var(--text-muted)] group-hover:text-royal-gold'} transition-colors shrink-0 relative`}>
+                                    {link.icon}
+                                    {/* Badge on icon when sidebar is collapsed */}
+                                    {!isOpen && !isMobile && link.badge && (
+                                        <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-royal-gold rounded-full flex items-center justify-center text-[7px] text-[var(--bg-base)] font-black">
+                                            {link.badge > 9 ? '9+' : link.badge}
+                                        </span>
+                                    )}
+                                </div>
+                                <AnimatePresence mode="wait">
+                                    {(isMobile || isOpen) && (
+                                        <motion.span
+                                            initial={{ opacity: 0, x: -10 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            exit={{ opacity: 0, x: -10 }}
+                                            className={`whitespace-nowrap flex items-center gap-2 ${location.pathname === link.path ? 'text-[var(--bg-base)]' : 'text-[var(--text-main)] group-hover:text-[var(--text-main)]'}`}
+                                        >
+                                            {link.label}
+                                            {link.badge && (
+                                                <span className="w-5 h-5 bg-royal-gold text-[var(--bg-base)] text-[9px] font-black rounded-full flex items-center justify-center">
+                                                    {link.badge > 9 ? '9+' : link.badge}
+                                                </span>
+                                            )}
+                                        </motion.span>
+                                    )}
+                                </AnimatePresence>
+                                {location.pathname === link.path && (
+                                    <motion.div
+                                        layoutId="sidebar-active"
+                                        className="absolute left-0 w-1.5 h-6 bg-royal-gold rounded-r-full"
+                                    />
+                                )}
+                            </Link>
+                        ))}
+                    </nav>
+
+                    <div className="p-4 border-t border-[var(--glass-border)] space-y-3">
+                        <div className={`flex items-center gap-4 bg-[var(--bg-highlight)]/50 p-3 rounded-2xl border border-[var(--glass-border)] overflow-hidden ${(!isOpen && !isMobile) ? 'justify-center' : ''}`}>
+                            <img
+                                src={user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name}`}
+                                className="w-10 h-10 rounded-xl border border-royal-gold/20 shrink-0"
+                                alt="U"
+                                loading="lazy"
+                            />
+                            {(isMobile || isOpen) && (
+                                <div className="flex flex-col min-w-0">
+                                    <span className="text-[10px] font-black text-[var(--text-main)] truncate">{user?.name || 'Guest'}</span>
+                                    <span className="text-[8px] font-black text-royal-gold uppercase tracking-widest truncate">{user?.role || 'Guest'} Access</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </motion.aside >
+
+            {/* Mobile Bottom Toggle (Visible only when sidebar is closed on small screens) */}
+            {
+                !isOpen && isMobile && (
+                    <button
+                        onClick={() => setIsOpen(true)}
+                        className="fixed bottom-8 right-8 z-[100] bg-[var(--text-main)] text-royal-gold p-5 rounded-3xl shadow-2xl border border-royal-gold/20 backdrop-blur-xl animate-bounce"
+                    >
+                        <FaBars size={24} />
+                    </button>
+                )
+            }
+        </>
+    );
+};
+
+export default Sidebar;

@@ -1,0 +1,197 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-base: #FFFFFF;
+    --bg-subtle: #FDFBF7;
+    --bg-highlight: #FFF9E6;
+    --text-main: #0F172A;
+    --text-muted: #64748B;
+    --royal-gold: #D4AF37;
+    --royal-gold-light: #F7E7CE;
+    --royal-gold-deep: #B8860B;
+    --btn-primary-bg: #0F172A;
+    --btn-primary-text: #D4AF37;
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 1);
+    --card-shadow: rgba(212, 175, 55, 0.08);
+    --sidebar-bg: #FFFFFF;
+    --input-bg: #F8FAFC;
+    --accent-red: #EF4444;
+  }
+
+  [data-theme='dark'] {
+    --bg-base: #020617;
+    --bg-subtle: #0F172A;
+    --bg-highlight: #1E293B;
+    --text-main: #F8FAFC;
+    --text-muted: #CBD5E1;
+    --royal-gold: #FCD34D;
+    --royal-gold-light: #41361E;
+    --royal-gold-deep: #D4AF37;
+    --btn-primary-bg: #FCD34D;
+    --btn-primary-text: #0F172A;
+    --glass-bg: rgba(15, 23, 42, 0.8);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --card-shadow: rgba(0, 0, 0, 0.6);
+    --sidebar-bg: #0F172A;
+    --input-bg: #1E293B;
+    --accent-red: #F87171;
+  }
+
+  body {
+    @apply antialiased transition-colors duration-500;
+    color: var(--text-main);
+    font-family: "Times New Roman", Times, serif;
+    background: radial-gradient(circle at 0% 0%, var(--bg-base) 0%, transparent 50%),
+      radial-gradient(circle at 100% 0%, var(--bg-subtle) 0%, transparent 50%),
+      radial-gradient(circle at 50% 100%, var(--bg-highlight) 0%, transparent 50%),
+      var(--bg-base);
+    background-attachment: fixed;
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    @apply bg-royal-gold/10 text-navy-deep;
+  }
+
+  /* Royal Aurora Mesh Animation (Light Version) */
+  body::before {
+    content: "";
+    @apply fixed inset-0 pointer-events-none;
+    background: radial-gradient(circle at 20% 30%, rgba(212, 175, 55, 0.03) 0%, transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(212, 175, 55, 0.05) 0%, transparent 40%);
+    z-index: 100;
+    mix-blend-mode: soft-light;
+    animation: aurora-shift 20s ease-in-out infinite alternate;
+  }
+
+  @keyframes aurora-shift {
+    0% {
+      transform: translate(0, 0) scale(1);
+    }
+
+    100% {
+      transform: translate(5%, 5%) scale(1.05);
+    }
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply backdrop-blur-3xl border rounded-[2.5rem] transition-all duration-700 relative overflow-hidden;
+    background-color: var(--glass-bg);
+    border-color: var(--glass-border);
+    box-shadow:
+      0 15px 45px -10px var(--card-shadow),
+      inset 0 0 50px rgba(255, 255, 255, 0.05);
+  }
+
+  .glass-card:hover {
+    @apply -translate-y-2;
+    border-color: var(--royal-gold);
+    box-shadow:
+      0 25px 60px -15px var(--card-shadow),
+      0 0 30px rgba(252, 211, 77, 0.05),
+      inset 0 0 50px rgba(255, 255, 255, 0.1);
+  }
+
+  .btn-primary {
+    @apply px-10 py-5 rounded-[1.8rem] font-black uppercase tracking-[0.25em] text-[11px] shadow-2xl transition-all duration-500 relative overflow-hidden flex items-center gap-3 justify-center border border-transparent;
+    background-color: var(--btn-primary-bg);
+    color: var(--btn-primary-text);
+  }
+
+  [data-theme='dark'] .btn-primary {
+    box-shadow: 0 10px 40px -10px rgba(252, 211, 77, 0.3);
+  }
+
+  .btn-primary:hover {
+    @apply brightness-110 -translate-y-1 shadow-royal-gold/30;
+    box-shadow: 0 15px 45px -10px rgba(252, 211, 77, 0.4);
+  }
+
+  .input-field {
+    @apply w-full border rounded-2xl px-6 py-4 placeholder:text-slate-400 focus:outline-none transition-all duration-500;
+    background-color: var(--input-bg);
+    border-color: var(--glass-border);
+    color: var(--text-main);
+  }
+
+  .input-field:focus {
+    border-color: var(--royal-gold);
+    @apply ring-4 ring-royal-gold/10;
+    box-shadow: 0 0 20px rgba(252, 211, 77, 0.1);
+  }
+
+  .title-royal {
+    @apply text-6xl tracking-tight leading-[0.85] text-transparent bg-clip-text;
+    background-image: linear-gradient(to bottom, var(--text-main), var(--text-muted));
+    filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.1));
+    font-weight: 900;
+  }
+
+  @screen md {
+    .title-royal {
+      @apply text-8xl;
+    }
+  }
+
+  .subtitle-royal {
+    @apply text-[10px] font-black uppercase tracking-[0.6em] mb-8 flex items-center gap-4;
+    color: var(--royal-gold);
+  }
+
+  .nav-link {
+    @apply flex items-center gap-4 px-8 py-4 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all duration-500;
+    color: var(--text-muted);
+  }
+
+  .nav-link:hover {
+    @apply bg-ivory-subtle;
+    color: var(--royal-gold);
+    background-color: var(--bg-highlight);
+  }
+
+  .nav-active {
+    background: linear-gradient(135deg, #FFD700 0%, var(--royal-gold) 100%);
+    @apply text-white shadow-xl shadow-royal-gold/20;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: var(--bg-base);
+}
+
+::-webkit-scrollbar-thumb {
+  @apply rounded-full border-2 transition-colors;
+  background-color: rgba(212, 175, 55, 0.3);
+  border-color: var(--bg-base);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--royal-gold);
+}
+
+/* Status Badges */
+.badge-gold {
+  @apply border px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest;
+  background-color: var(--royal-gold-light);
+  color: var(--royal-gold);
+  border-color: var(--royal-gold-deep);
+}
+
+.badge-navy {
+  @apply px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest shadow-lg;
+  background-color: var(--text-main);
+  color: var(--bg-base);
+}
