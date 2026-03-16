@@ -1,13 +1,29 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaQuestionCircle, FaLifeRing, FaChevronDown, FaSearch, FaTicketAlt, FaShieldAlt, FaComments } from 'react-icons/fa';
-import axios from 'axios';
+import { FaQuestionCircle, FaLifeRing, FaChevronDown, FaSearch, FaTicketAlt, FaShieldAlt, FaComments, FaPhone } from 'react-icons/fa';
+import api from '../utils/api';
+import { useSocket } from '../context/SocketContext';
+import { toast } from 'react-hot-toast';
 
 const HelpPage = () => {
+    const { startCall } = useSocket();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFaq, setActiveFaq] = useState(null);
     const [ticketData, setTicketData] = useState({ subject: '', type: 'general', message: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isCalling, setIsCalling] = useState(false);
+
+    const callSupport = async () => {
+        setIsCalling(true);
+        try {
+            const { data } = await api.get('/auth/support-admin');
+            await startCall(data, 'voice');
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Support specialists currently busy');
+        } finally {
+            setIsCalling(false);
+        }
+    };
 
     const faqs = [
         { q: "How do I authorize a painter?", a: "Navigate to your Explore tab, find a specialist, and initialize a mission request via the 'Book Now' interface." },
@@ -22,10 +38,7 @@ const HelpPage = () => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            const token = localStorage.getItem('token');
-            await axios.post(`${import.meta.env.VITE_API_URL}/api/support`, ticketData, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.post('/support', ticketData);
             alert('Support Ticket Synchronized. Intelligence team will analyze shortly.');
             setTicketData({ subject: '', type: 'general', message: '' });
         } catch (_) {
@@ -93,13 +106,20 @@ const HelpPage = () => {
 
                     {/* Quick Support Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="p-8 bg-navy-deep rounded-[2.5rem] text-white shadow-2xl shadow-navy-deep/20 flex items-center gap-6 group hover:translate-y-[-5px] transition-all">
+                        <div 
+                            onClick={callSupport}
+                            className={`p-8 bg-navy-deep rounded-[2.5rem] text-white shadow-2xl shadow-navy-deep/20 flex items-center gap-6 group hover:translate-y-[-5px] transition-all cursor-pointer ${isCalling ? 'opacity-80 pointer-events-none' : ''}`}
+                        >
                             <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-royal-gold text-2xl group-hover:scale-110 transition-transform">
-                                <FaComments />
+                                {isCalling ? (
+                                    <div className="w-6 h-6 border-2 border-royal-gold/30 border-t-royal-gold rounded-full animate-spin" />
+                                ) : (
+                                    <FaComments />
+                                )}
                             </div>
                             <div>
-                                <h4 className="text-[10px] font-black uppercase tracking-widest text-royal-gold">Live Intercept</h4>
-                                <p className="text-[9px] opacity-60 mt-1">Direct relay to platform specialists</p>
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-royal-gold">{t('live_intercept') || 'Live Intercept'}</h4>
+                                <p className="text-[9px] opacity-60 mt-1">{t('direct_relay_desc') || 'Direct relay to platform specialists'}</p>
                             </div>
                         </div>
                         <div className="p-8 bg-white rounded-[2.5rem] border border-royal-gold/10 shadow-xl flex items-center gap-6 group hover:translate-y-[-5px] transition-all">
