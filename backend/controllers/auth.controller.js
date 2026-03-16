@@ -64,6 +64,28 @@ export const loginUser = async (req, res) => {
     try {
         const user = await User.findOne({ email });
 
+        if (!user) {
+            return res.status(401).json({ message: 'Invalid email or password' });
+        }
+
+        if (user.isBlocked) {
+            return res.status(403).json({ message: 'Your account has been blocked. Please contact support for assistance.' });
+        }
+
+        if (user.isSuspended) {
+            return res.status(403).json({ message: 'Your account has been suspended. Please check your email for more details.' });
+        }
+
+        // Check if worker is verified
+        if (user.role === 'worker') {
+            const worker = await Worker.findOne({ user: user._id });
+            if (worker && !worker.isVerified) {
+                return res.status(403).json({ 
+                    message: 'Your account is awaiting admin verification. Please try again later or contact support.' 
+                });
+            }
+        }
+
         if (user && (await user.matchPassword(password))) {
             res.json({
                 _id: user._id,
@@ -114,8 +136,15 @@ export const googleAuthUser = async (req, res) => {
                 email,
                 googleId,
                 profileImage: picture,
-                role: 'user',
             });
+        }
+
+        if (user.isBlocked) {
+            return res.status(403).json({ message: 'Your account has been blocked.' });
+        }
+
+        if (user.isSuspended) {
+            return res.status(403).json({ message: 'Your account has been suspended.' });
         }
 
         res.json({
@@ -129,5 +158,18 @@ export const googleAuthUser = async (req, res) => {
     } catch (error) {
         console.error('Google auth error:', error);
         res.status(401).json({ message: 'Google authentication failed' });
+    }
+};
+
+// @desc    Get support admin ID
+// @route   GET /api/auth/support-admin
+// @access  Protected
+export const getSupportAdmin = async (req, res) => {
+    try {
+        const admin = await User.findOne({ role: 'admin' });
+        if (!admin) return res.status(404).json({ message: 'No support specialist online' });
+        res.json({ _id: admin._id, name: admin.name, profileImage: admin.profileImage });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
