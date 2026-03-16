@@ -46,11 +46,11 @@ const LoginPage = () => {
                 else if (userRole === 'worker') navigate('/worker-dashboard');
                 else navigate('/user-dashboard');
             } else {
-                setError(res.message || 'Google sign-in failed. Please try again.');
+                setError(res.message || t('action_failed'));
             }
         },
         onError: () => {
-            setError('Google sign-in failed. Please try again.');
+            setError(t('action_failed'));
         },
     });
 
@@ -60,21 +60,21 @@ const LoginPage = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8 }}
-                className="glass-card p-10 md:p-14 w-full max-w-lg relative overflow-hidden"
+                className="glass-card p-8 sm:p-10 md:p-14 w-full max-w-lg relative overflow-hidden"
             >
                 {/* Authority Badge */}
                 <div className="absolute top-0 right-0 p-8 opacity-20 text-[10px] font-black tracking-[0.4em] uppercase text-yellow-500">
                     {t('job_id')}: {role?.toUpperCase() || "GATEWAY"}
                 </div>
 
-                <div className="text-center mb-10 relative z-10">
+                <div className="text-center mb-10 relative z-10 px-2">
                     <div className="subtitle-royal justify-center text-royal-gold">
                         {t('login_title')}
                     </div>
-                    <h2 className="title-royal text-5xl md:text-6xl mb-6 bg-gradient-to-b from-[var(--text-main)] to-[var(--text-muted)] bg-clip-text text-transparent">
+                    <h2 className="title-royal text-4xl sm:text-5xl md:text-6xl mb-4 sm:mb-6 bg-gradient-to-b from-[var(--text-main)] to-[var(--text-muted)] bg-clip-text text-transparent">
                         {role === 'worker' ? t('welcome_back_worker') : t('welcome_back_user')}
                     </h2>
-                    <p className="text-[var(--text-muted)] font-bold uppercase tracking-widest text-[10px] opacity-60">{t('elite_portal')}</p>
+                    <p className="text-[var(--text-muted)] font-bold uppercase tracking-widest text-[8px] sm:text-[10px] opacity-60">{t('elite_portal')}</p>
                 </div>
 
                 {error && (
@@ -83,7 +83,19 @@ const LoginPage = () => {
                         animate={{ opacity: 1, x: 0 }}
                         className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl mb-8 text-center text-xs font-bold uppercase tracking-wider"
                     >
-                        Error: {error}
+                        {t('error_prefix')}: {error}
+                    </motion.div>
+                )}
+
+                {role === 'worker' && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-royal-gold/10 border border-royal-gold/20 text-royal-gold p-4 rounded-xl mb-8 text-center space-y-2"
+                    >
+                        <p className="text-[10px] font-black uppercase tracking-widest">{t('default_protocol')}</p>
+                        <p className="text-xs font-bold">{t('password_term')}: <span className="bg-royal-gold/20 px-2 py-0.5 rounded ml-1">worker@123</span></p>
+                        <p className="text-[9px] opacity-60 uppercase tracking-widest">{t('entry_granted_tip')}</p>
                     </motion.div>
                 )}
 
@@ -113,7 +125,7 @@ const LoginPage = () => {
 
                     <button type="submit" disabled={loading} className="w-full btn-primary !rounded-2xl shadow-xl flex items-center justify-center gap-3">
                         {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                        {loading ? 'Authorizing...' : t('sign_in_now')}
+                        {loading ? t('authorizing') : t('sign_in_now')}
                     </button>
                 </form>
 
@@ -140,12 +152,18 @@ const LoginPage = () => {
                             <FaGoogle className="text-yellow-600 text-lg" />
                         )}
                     </div>
-                    <span>{googleLoading ? 'Signing in...' : t('continue_google')}</span>
+                    <span>{googleLoading ? t('signing_in') : t('continue_google')}</span>
                 </button>
 
-                {role !== 'admin' && (
+                {role !== 'admin' && role !== 'worker' && (
                     <p className="mt-12 text-center text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[0.3em]">
                         {t('new_to_network')} <span className="text-yellow-600 cursor-pointer hover:text-yellow-700 transition-colors" onClick={() => navigate(`/register/${role}`)}>{t('create_identity')}</span>
+                    </p>
+                )}
+
+                {role === 'worker' && (
+                    <p className="mt-12 text-center text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[0.3em] opacity-40">
+                        {t('worker_registration_disabled') || 'Worker registration managed by Administrative Layer'}
                     </p>
                 )}
             </motion.div>
