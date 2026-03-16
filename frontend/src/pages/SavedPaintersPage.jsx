@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { FaHeart, FaMapMarkerAlt, FaStar, FaTrash, FaPaintBrush, FaInbox } from 'react-icons/fa';
+import { FaHeart, FaMapMarkerAlt, FaStar, FaTrash } from 'react-icons/fa';
 import BookingModal from '../components/BookingModal';
+import api from '../utils/api';
 
 const SavedPaintersPage = () => {
     const navigate = useNavigate();
@@ -12,25 +12,26 @@ const SavedPaintersPage = () => {
     const [bookingWorker, setBookingWorker] = useState(null);
 
     useEffect(() => {
-        const fetch = async () => {
+        const fetchSaved = async () => {
             try {
-                const { data } = await axios.get(
-                    `${import.meta.env.VITE_API_URL}/api/users/saved-painters`,
-                    { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-                );
+                const { data } = await api.get('/users/saved-painters');
                 setSaved(data);
-            } catch (e) { console.error(e); }
-            finally { setLoading(false); }
+            } catch (e) { 
+                console.error(e); 
+            } finally { 
+                setLoading(false); 
+            }
         };
-        fetch();
+        fetchSaved();
     }, []);
 
     const unsave = async (workerId) => {
-        await axios.put(
-            `${import.meta.env.VITE_API_URL}/api/users/save-painter/${workerId}`, {},
-            { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-        );
-        setSaved(prev => prev.filter(w => w._id !== workerId));
+        try {
+            await api.put(`/users/save-painter/${workerId}`, {});
+            setSaved(prev => prev.filter(w => w._id !== workerId));
+        } catch (e) {
+            console.error(e);
+        }
     };
 
     return (
@@ -75,7 +76,7 @@ const SavedPaintersPage = () => {
                                 <div className="p-7">
                                     <div className="flex items-center gap-5 mb-6">
                                         <img
-                                            src={worker.user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${worker.user?.name}`}
+                                            src={worker.user?.profileImage || "/assets/premium-avatar.png"}
                                             className="w-16 h-16 rounded-2xl object-cover border-2 border-royal-gold/20"
                                             alt={worker.user?.name}
                                         />
