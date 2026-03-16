@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -15,11 +16,20 @@ import adminRoutes from './routes/admin.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
 import supportRoutes from './routes/support.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
-import { sendCallNotification } from './controllers/notification.controller.js';
+import callRoutes from './routes/call.routes.js';
+import { sendCallNotification, createNotification } from './controllers/notification.controller.js';
+import { createCallRecord, updateCallRecord } from './controllers/call.controller.js';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
 const app = express();
+app.use(compression());
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
@@ -51,6 +61,14 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/calls', callRoutes);
+
+// Static Uploads Folder
+const uploadPath = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadPath)) {
+    fs.mkdirSync(uploadPath, { recursive: true });
+}
+app.use('/uploads', express.static(uploadPath));
 
 // Database
 const connectDB = async () => {
@@ -67,19 +85,37 @@ connectDB();
 app.get('/', (req, res) => res.send('Find Your Painter API is running...'));
 
 // ─── Socket.IO ────────────────────────────────────────────────────────────────
-const onlineUsers = new Map(); // userId -> socketId
+const onlineUsers = new Map(); // userId -> Set<socketId>
+const workerToUser = new Map(); // workerId -> userId (for resolving signaling to workers)
+const activeCalls = new Map(); // socket.id -> callRecordId
 
 io.on('connection', (socket) => {
     console.log('Socket connected:', socket.id);
 
-    // Register user as online
-    socket.on('user_online', (userId) => {
-        onlineUsers.set(userId, socket.id);
+    // Track user when they explicitly signal being online
+    socket.on('user_online', async (userId) => {
+        if (!userId) return;
+        const uid = userId.toString();
+        if (!onlineUsers.has(uid)) {
+            onlineUsers.set(uid, new Set());
+        }
+        onlineUsers.get(uid).add(socket.id);
+
+        // Map workerId to userId for resolve-less signaling
+        try {
+            const worker = await mongoose.model('Worker').findOne({ user: uid });
+            if (worker) {
+                workerToUser.set(worker._id.toString(), uid);
+            }
+        } catch (e) {
+            // Model might not be loaded yet or user isn't a worker
+        }
+
         io.emit('online_users', Array.from(onlineUsers.keys()));
-        console.log(`User ${userId} online → socket ${socket.id}`);
+        console.log(`User ${uid} online → sockets count: ${onlineUsers.get(uid).size}`);
     });
 
-    // ── Chat ──────────────────────────────────────────────────────────────────
+    // Join/Leave chat rooms
     socket.on('join_chat', (bookingId) => {
         socket.join(bookingId);
         console.log(`Socket ${socket.id} joined room: ${bookingId}`);
@@ -95,71 +131,160 @@ io.on('connection', (socket) => {
         socket.to(bookingId).emit('user_stop_typing', { userId });
     });
 
+    socket.on('message_reaction', ({ bookingId, messageId, emoji, userId }) => {
+        io.to(bookingId).emit('message_reaction', { messageId, emoji, userId });
+    });
+
     // ── WebRTC Call Signaling ─────────────────────────────────────────────────
 
-    // Caller sends offer to target user
     socket.on('call_offer', async ({ toUserId, fromUserId, fromUserName, fromUserImage, callType, offer }) => {
-        const targetSocket = onlineUsers.get(toUserId);
-
-        // Send WebRTC offer via Socket if online
-        if (targetSocket) {
-            io.to(targetSocket).emit('incoming_call', { fromUserId, fromUserName, fromUserImage, callType, offer });
-            console.log(`📞 Call offer: ${fromUserId} → ${toUserId}`);
-        } else {
-            // If offline, let the caller know it might take a moment (push)
-            socket.emit('call_waiting', { message: 'User is offline. Sending push notification...' });
+        let targetUid = toUserId.toString();
+        // Resolve workerId to userId if necessary
+        if (workerToUser.has(targetUid)) {
+            console.log(`[Socket] Resolving workerId ${targetUid} to userId ${workerToUser.get(targetUid)}`);
+            targetUid = workerToUser.get(targetUid);
         }
 
-        // Always send push notification as backup (or handle offline logic)
+        const targetSockets = onlineUsers.get(targetUid);
+
+        const callRecord = await mongoose.model('CallHistory').create({
+            caller: fromUserId,
+            receiver: toUserId,
+            type: callType || 'voice',
+            status: targetSockets && targetSockets.size > 0 ? 'ringing' : 'missed',
+            startTime: Date.now()
+        }).catch(err => console.error('Call log error:', err));
+
+        if (callRecord) activeCalls.set(socket.id, callRecord._id);
+
+        if (targetSockets && targetSockets.size > 0) {
+            targetSockets.forEach(sid => {
+                io.to(sid).emit('incoming_call', { 
+                    fromUserId, 
+                    fromUserName, 
+                    fromUserImage, 
+                    callType, 
+                    offer, 
+                    callId: callRecord?._id,
+                    timestamp: Date.now() 
+                });
+            });
+        } else {
+            socket.emit('call_waiting', { message: 'User is offline. Sending push notification...' });
+            await createNotification({
+                user: toUserId,
+                type: 'system',
+                title: 'Missed Call',
+                message: `You missed a ${callType} call from ${fromUserName}.`,
+                icon: callType === 'video' ? '📹' : '📞'
+            });
+        }
+
         try {
             await sendCallNotification(toUserId, {
                 callerId: fromUserId,
                 callerName: fromUserName,
                 callerImage: fromUserImage,
                 callType,
-                callId: `${fromUserId}-${Date.now()}` // Generate a unique call ID
+                callId: callRecord?._id || `${fromUserId}-${Date.now()}`
             });
         } catch (error) {
             console.error('Failed to send push notification:', error);
         }
     });
 
-    // Receiver acknowledges 'incoming_call' so the caller knows it is ringing
     socket.on('call_received', ({ toUserId }) => {
-        const callerSocket = onlineUsers.get(toUserId);
-        if (callerSocket) io.to(callerSocket).emit('call_ringing');
+        let targetUid = toUserId.toString();
+        if (workerToUser.has(targetUid)) targetUid = workerToUser.get(targetUid);
+        const callerSockets = onlineUsers.get(targetUid);
+        if (callerSockets) callerSockets.forEach(sid => io.to(sid).emit('call_ringing'));
     });
 
-    // Receiver sends WebRTC answer back to caller
-    socket.on('call_answer', ({ toUserId, answer }) => {
-        const targetSocket = onlineUsers.get(toUserId);
-        if (targetSocket) io.to(targetSocket).emit('call_answered', { answer });
-    });
-
-    // Either side rejects/declines
-    socket.on('call_reject', ({ toUserId, reason }) => {
-        const targetSocket = onlineUsers.get(toUserId);
-        if (targetSocket) io.to(targetSocket).emit('call_rejected', { reason: reason || 'Call declined.' });
-    });
-
-    // Either side ends the call
-    socket.on('call_end', ({ toUserId }) => {
-        const targetSocket = onlineUsers.get(toUserId);
-        if (targetSocket) io.to(targetSocket).emit('call_ended');
-    });
-
-    // ICE candidate exchange
-    socket.on('ice_candidate', ({ toUserId, candidate }) => {
-        const targetSocket = onlineUsers.get(toUserId);
-        if (targetSocket) io.to(targetSocket).emit('ice_candidate', { candidate });
-    });
-
-    // ── Disconnect ────────────────────────────────────────────────────────────
-    socket.on('disconnect', () => {
-        for (const [userId, sid] of onlineUsers.entries()) {
-            if (sid === socket.id) { onlineUsers.delete(userId); break; }
+    socket.on('call_answer', ({ toUserId, answer, callId }) => {
+        let targetUid = toUserId.toString();
+        if (workerToUser.has(targetUid)) targetUid = workerToUser.get(targetUid);
+        const targetSockets = onlineUsers.get(targetUid);
+        if (targetSockets) targetSockets.forEach(sid => io.to(sid).emit('call_answered', { answer }));
+        
+        // Notify other sockets of the receiver that call was accepted elsewhere
+        let receiverId = null;
+        for (const [uid, sockets] of onlineUsers.entries()) {
+            if (sockets.has(socket.id)) { receiverId = uid; break; }
         }
-        io.emit('online_users', Array.from(onlineUsers.keys()));
+        if (receiverId) {
+            onlineUsers.get(receiverId).forEach(sid => {
+                if (sid !== socket.id) io.to(sid).emit('call_accepted_elsewhere');
+            });
+        }
+        if (callId) activeCalls.set(socket.id, callId);
+    });
+
+    socket.on('call_reject', async ({ toUserId, reason }) => {
+        let targetUid = toUserId.toString();
+        if (workerToUser.has(targetUid)) targetUid = workerToUser.get(targetUid);
+        const targetSockets = onlineUsers.get(targetUid);
+        const callId = activeCalls.get(socket.id);
+        if (callId) {
+            await updateCallRecord(callId, { status: 'rejected', endTime: Date.now() });
+            activeCalls.delete(socket.id);
+        }
+        if (targetSockets) targetSockets.forEach(sid => io.to(sid).emit('call_rejected', { reason: reason || 'Call declined.' }));
+        
+        // Notify other sockets of the rejecter
+        let rejecterId = null;
+        for (const [uid, sockets] of onlineUsers.entries()) {
+            if (sockets.has(socket.id)) { rejecterId = uid; break; }
+        }
+        if (rejecterId) {
+            onlineUsers.get(rejecterId).forEach(sid => {
+                if (sid !== socket.id) io.to(sid).emit('call_rejected_elsewhere');
+            });
+        }
+    });
+
+    socket.on('call_end', async ({ toUserId }) => {
+        let targetUid = toUserId.toString();
+        if (workerToUser.has(targetUid)) targetUid = workerToUser.get(targetUid);
+        const targetSockets = onlineUsers.get(targetUid);
+        const callId = activeCalls.get(socket.id);
+        if (callId) {
+            const call = await mongoose.model('CallHistory').findById(callId);
+            if (call) {
+                const duration = Math.round((Date.now() - new Date(call.startTime)) / 1000);
+                await updateCallRecord(callId, { status: 'completed', endTime: Date.now(), duration });
+            }
+            activeCalls.delete(socket.id);
+        }
+        if (targetSockets) targetSockets.forEach(sid => io.to(sid).emit('call_ended'));
+    });
+
+    socket.on('ice_candidate', ({ toUserId, candidate }) => {
+        let targetUid = toUserId.toString();
+        if (workerToUser.has(targetUid)) targetUid = workerToUser.get(targetUid);
+        const targetSockets = onlineUsers.get(targetUid);
+        if (targetSockets) targetSockets.forEach(sid => io.to(sid).emit('ice_candidate', { candidate }));
+    });
+
+    socket.on('disconnect', () => {
+        let disconnectedUserId = null;
+        for (const [userId, sockets] of onlineUsers.entries()) {
+            if (sockets.has(socket.id)) {
+                sockets.delete(socket.id);
+                if (sockets.size === 0) {
+                    onlineUsers.delete(userId);
+                    disconnectedUserId = userId;
+                }
+                break;
+            }
+        }
+        if (disconnectedUserId) {
+            io.emit('online_users', Array.from(onlineUsers.keys()));
+        }
+        if (activeCalls.has(socket.id)) {
+            const callId = activeCalls.get(socket.id);
+            updateCallRecord(callId, { status: 'disconnected', endTime: Date.now() }).catch(() => {});
+            activeCalls.delete(socket.id);
+        }
         console.log('Socket disconnected:', socket.id);
     });
 });
