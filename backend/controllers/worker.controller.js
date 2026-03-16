@@ -1,6 +1,20 @@
 import { Worker } from '../models/Worker.js';
 import { User } from '../models/User.js';
 import { createNotification } from './notification.controller.js';
+import { AuditLog } from '../models/AuditLog.js';
+
+const logAction = async (adminId, type, subject, action) => {
+    try {
+        await AuditLog.create({
+            admin: adminId,
+            type,
+            subject,
+            action
+        });
+    } catch (error) {
+        console.error('Audit logging failed', error);
+    }
+};
 
 // @desc    Get all available workers
 // @route   GET /api/workers
@@ -10,7 +24,11 @@ export const getWorkers = async (req, res) => {
         const workers = await Worker.find({
             isVerified: true,
             isAvailable: true
-        }).populate('user', 'name profileImage');
+        })
+        .populate('user', 'name profileImage')
+        .select('-idProof -verificationComments -portfolioImages') // Exclude heavy/private fields
+        .sort({ isFeatured: -1, rating: -1 })
+        .limit(100); // Protection against massive data transfers
 
         res.json(workers);
     } catch (error) {
@@ -46,11 +64,15 @@ export const applyToBecomeWorker = async (req, res) => {
 
         const worker = await Worker.create({
             user: req.user._id,
+            fullName: req.body.fullName,
+            applicationEmail: req.body.applicationEmail,
+            applicationPhone: req.body.applicationPhone,
             skills: req.body.skills,
             experience: req.body.experience,
             location: req.body.location,
             price: req.body.price,
             bio: req.body.bio,
+            idProof: req.file ? `/uploads/${req.file.filename}` : req.body.idProof,
             verificationStatus: 'pending',
             isVerified: false,
             isAvailable: false // Not available until verified
@@ -121,6 +143,14 @@ export const verifyWorker = async (req, res) => {
         }
 
         await worker.save();
+
+        await logAction(
+            req.user._id,
+            status === 'approved' ? 'worker_verify' : 'worker_reject',
+            worker.fullName || 'Unknown',
+            `${status === 'approved' ? 'Approved' : 'Rejected'} specialist application`
+        );
+
         res.json(worker);
     } catch (error) {
         res.status(500).json({ message: error.message });
