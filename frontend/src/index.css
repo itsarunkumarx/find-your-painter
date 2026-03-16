@@ -5,18 +5,18 @@
 @layer base {
   :root {
     --bg-base: #FFFFFF;
-    --bg-subtle: #FDFBF7;
-    --bg-highlight: #FFF9E6;
+    --bg-subtle: #F8FAFC;
+    --bg-highlight: #FDFBF7;
     --text-main: #0F172A;
-    --text-muted: #64748B;
+    --text-muted: #475569;
     --royal-gold: #D4AF37;
-    --royal-gold-light: #F7E7CE;
+    --royal-gold-light: #FDF4D4;
     --royal-gold-deep: #B8860B;
     --btn-primary-bg: #0F172A;
     --btn-primary-text: #D4AF37;
-    --glass-bg: rgba(255, 255, 255, 0.7);
-    --glass-border: rgba(255, 255, 255, 1);
-    --card-shadow: rgba(212, 175, 55, 0.08);
+    --glass-bg: rgba(255, 255, 255, 0.75);
+    --glass-border: rgba(15, 23, 42, 0.05);
+    --card-shadow: rgba(15, 23, 42, 0.08);
     --sidebar-bg: #FFFFFF;
     --input-bg: #F8FAFC;
     --accent-red: #EF4444;
@@ -24,25 +24,25 @@
 
   [data-theme='dark'] {
     --bg-base: #020617;
-    --bg-subtle: #0F172A;
-    --bg-highlight: #1E293B;
-    --text-main: #F8FAFC;
-    --text-muted: #CBD5E1;
+    --bg-subtle: #0B0F1A;
+    --bg-highlight: #111827;
+    --text-main: #F1F5F9;
+    --text-muted: #94A3B8;
     --royal-gold: #FCD34D;
-    --royal-gold-light: #41361E;
+    --royal-gold-light: #2D2510;
     --royal-gold-deep: #D4AF37;
     --btn-primary-bg: #FCD34D;
-    --btn-primary-text: #0F172A;
-    --glass-bg: rgba(15, 23, 42, 0.8);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --card-shadow: rgba(0, 0, 0, 0.6);
-    --sidebar-bg: #0F172A;
-    --input-bg: #1E293B;
+    --btn-primary-text: #020617;
+    --glass-bg: rgba(2, 6, 23, 0.8);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --card-shadow: rgba(0, 0, 0, 0.4);
+    --sidebar-bg: #020617;
+    --input-bg: #0F172A;
     --accent-red: #F87171;
   }
 
   body {
-    @apply antialiased transition-colors duration-500;
+    @apply antialiased transition-all duration-500;
     color: var(--text-main);
     font-family: "Times New Roman", Times, serif;
     background: radial-gradient(circle at 0% 0%, var(--bg-base) 0%, transparent 50%),
