@@ -57,6 +57,27 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-router-dom') || id.includes('react-dom')) {
+              return 'vendor-react';
+            }
+            if (id.includes('react-icons') || id.includes('framer-motion')) {
+              return 'vendor-ui';
+            }
+            if (id.includes('recharts') || id.includes('axios') || id.includes('i18next')) {
+              return 'vendor-utils';
+            }
+            return 'vendor';
+          }
+        }
+      }
+    }
+  },
   server: {
     hmr: {
       overlay: false, // Disable red error overlay so ErrorBoundary handles errors cleanly
