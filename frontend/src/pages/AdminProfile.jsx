@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 
 const AdminProfile = () => {
     const { t } = useTranslation();
+    if (!t) return null;
     const { user } = useAuth();
     const navigate = useNavigate();
 
