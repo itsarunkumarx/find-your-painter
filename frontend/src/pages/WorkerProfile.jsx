@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+
 import { motion } from 'framer-motion';
 import { FaMapMarkerAlt, FaStar, FaShieldAlt, FaEdit, FaBriefcase, FaUser } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +10,7 @@ import { useWorker } from '../hooks/useWorker';
 
 const WorkerProfile = () => {
     const { t } = useTranslation();
+    if (!t) return null;
     const { user } = useAuth();
     const navigate = useNavigate();
     const { worker, loading } = useWorker();
