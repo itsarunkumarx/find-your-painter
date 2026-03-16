@@ -29,4 +29,9 @@ const bookingSchema = new mongoose.Schema({
     message: { type: String },
 }, { timestamps: true });
 
+// Performance Indices
+bookingSchema.index({ user: 1 });
+bookingSchema.index({ worker: 1 });
+bookingSchema.index({ status: 1 });
+
 export const Booking = mongoose.model('Booking', bookingSchema);
