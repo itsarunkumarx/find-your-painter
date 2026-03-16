@@ -71,6 +71,10 @@ export const getWorkerBookings = async (req, res) => {
 
         const bookings = await Booking.find({ worker: worker._id })
             .populate('user', 'name email phoneNumber profileImage')
+            .populate({
+                path: 'worker',
+                populate: { path: 'user', select: 'name profileImage' }
+            })
             .sort({ createdAt: -1 });
         res.json(bookings);
     } catch (error) {
