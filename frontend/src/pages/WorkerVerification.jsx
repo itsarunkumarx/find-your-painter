@@ -1,20 +1,19 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { motion } from 'framer-motion';
 import { FaShieldAlt, FaClock, FaCheckCircle, FaExclamationTriangle, FaCommentAlt } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 
 const WorkerVerification = () => {
     const { t } = useTranslation();
+    if (!t) return null;
     const [worker, setWorker] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchProfile = async () => {
             try {
-                const token = localStorage.getItem('token');
-                const config = { headers: { Authorization: `Bearer ${token}` } };
-                const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/workers/profile`, config);
+                const { data } = await api.get('/workers/profile');
                 setWorker(data);
             } catch (error) {
                 console.error("Fetch profile error", error);
@@ -104,7 +103,14 @@ const WorkerVerification = () => {
                                 <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-navy-deep/30 mb-6">{t('submitted_identity')}</h4>
                                 <div className="p-4 bg-navy-deep/[0.03] rounded-2xl border border-navy-deep/5 flex items-center justify-between">
                                     <span className="text-xs font-bold text-navy-deep/60">{t('gov_id_proof')}</span>
-                                    <a href={worker?.idProof} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-royal-gold underline tracking-widest uppercase">{t('view_node')}</a>
+                                    <a 
+                                        href={worker?.idProof} 
+                                        target="_blank" 
+                                        rel="noreferrer" 
+                                        className="text-[10px] font-bold text-royal-gold underline tracking-widest uppercase"
+                                    >
+                                        {t('view_node')}
+                                    </a>
                                 </div>
                             </div>
                             <div className="glass-card p-8 bg-white/40 border-navy-deep/5">
