@@ -6,13 +6,14 @@ import {
     togglePortfolioFeatured
 } from '../controllers/worker.controller.js';
 import { protect, adminObj } from '../middleware/auth.middleware.js';
+import upload from '../middleware/upload.middleware.js';
 
 const router = express.Router();
 
 router.get('/', protect, getWorkers);
 router.get('/stats', protect, getWorkerStats);
 router.get('/earnings', protect, getWorkerEarnings);
-router.post('/apply', protect, applyToBecomeWorker);
+router.post('/apply', protect, upload.single('idProof'), applyToBecomeWorker);
 router.get('/pending', protect, adminObj, getPendingWorkers);
 router.get('/profile', protect, getMyProfile);
 router.put('/profile', protect, updateWorkerProfile);
