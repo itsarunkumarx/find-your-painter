@@ -9,28 +9,40 @@ import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { SocketProvider } from './context/SocketContext'
-import { registerSW } from 'virtual:pwa-register'
 
 // Capture PWA install prompt globally
 window.deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   window.deferredPrompt = e;
-  // Dispatch a custom event so components can listen for it if they missed it
   window.dispatchEvent(new CustomEvent('pwa-prompt-available'));
 });
 
-// Register Service Worker
-const swUrl = import.meta.env.DEV ? '/dev-sw.js?dev-sw' : '/sw.js';
-registerSW({
-  immediate: true,
-  onRegisteredSW(swUrl, registration) {
-    console.log('SW Registered:', swUrl);
-  },
-  onRegisterError(error) {
-    console.error('SW Registration error:', error);
+// Unregister any stale service workers in dev mode to prevent React duplicate instance crashes.
+// Workbox StaleWhileRevalidate was caching multiple versioned React builds simultaneously.
+if (import.meta.env.DEV) {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const reg of registrations) {
+        reg.unregister();
+        console.log('[dev] Unregistered stale service worker:', reg.scope);
+      }
+    });
   }
-})
+} else {
+  // Production only: register the service worker
+  import('virtual:pwa-register').then(({ registerSW }) => {
+    registerSW({
+      immediate: true,
+      onRegisteredSW(swUrl) {
+        console.log('SW Registered:', swUrl);
+      },
+      onRegisterError(error) {
+        console.warn('SW Registration error:', error);
+      }
+    });
+  });
+}
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
