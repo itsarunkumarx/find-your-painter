@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/api';
 import { useTranslation } from 'react-i18next';
 import { FaPaintRoller, FaArrowLeft, FaCloudUploadAlt } from 'react-icons/fa';
 
@@ -11,17 +11,24 @@ const BecomePainterPage = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [formData, setFormData] = useState({
+        fullName: '',
+        applicationEmail: '',
+        applicationPhone: '',
         skills: '',
         experience: '',
         location: '',
         price: '',
         bio: '',
-        idProof: '',
+        idProof: null,
         workImages: ''
     });
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        if (e.target.name === 'idProof') {
+            setFormData({ ...formData, idProof: e.target.files[0] });
+        } else {
+            setFormData({ ...formData, [e.target.name]: e.target.value });
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -30,20 +37,20 @@ const BecomePainterPage = () => {
         setError('');
 
         try {
-            const token = localStorage.getItem('token');
             const skillsArray = formData.skills.split(',').map(s => s.trim());
 
-            const config = {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            };
+            const submissionData = new FormData();
+            Object.keys(formData).forEach(key => {
+                if (key === 'skills') {
+                    submissionData.append(key, JSON.stringify(skillsArray));
+                } else if (key === 'workImages') {
+                    submissionData.append(key, JSON.stringify(formData.workImages.split(',').map(img => img.trim()).filter(img => img !== '')));
+                } else {
+                    submissionData.append(key, formData[key]);
+                }
+            });
 
-            await axios.post(`${import.meta.env.VITE_API_URL}/api/workers/apply`, {
-                ...formData,
-                skills: skillsArray,
-                workImages: formData.workImages.split(',').map(img => img.trim()).filter(img => img !== '')
-            }, config);
+            await api.post('/workers/apply', submissionData);
 
             // Redirect to a "Pending" view or dashboard with status
             navigate('/user-dashboard');
@@ -124,6 +131,31 @@ const BecomePainterPage = () => {
                             )}
 
                             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2 col-span-2 md:col-span-1">
+                                    <label className="text-[10px] font-bold text-navy-deep/40 uppercase tracking-widest ml-2">Full Legal Name</label>
+                                    <input
+                                        name="fullName"
+                                        placeholder="Enter your full name"
+                                        onChange={handleChange}
+                                        value={formData.fullName}
+                                        className="input-field"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="space-y-2 col-span-2 md:col-span-1">
+                                    <label className="text-[10px] font-bold text-navy-deep/40 uppercase tracking-widest ml-2">Contact Email ID</label>
+                                    <input
+                                        type="email"
+                                        name="applicationEmail"
+                                        placeholder="your@email.com"
+                                        onChange={handleChange}
+                                        value={formData.applicationEmail}
+                                        className="input-field"
+                                        required
+                                    />
+                                </div>
+
                                 <div className="space-y-2 col-span-2">
                                     <label className="text-[10px] font-bold text-navy-deep/40 uppercase tracking-widest ml-2">{t('expertise_comma')}</label>
                                     <input
@@ -190,14 +222,23 @@ const BecomePainterPage = () => {
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <label className="text-[8px] font-black uppercase tracking-[0.2em] text-navy-deep/30 ml-2">{t('id_proof_secret')}</label>
-                                            <input
-                                                name="idProof"
-                                                placeholder={t('id_link_placeholder')}
-                                                onChange={handleChange}
-                                                className="input-field text-[10px]"
-                                                required
-                                            />
+                                            <label className="text-[8px] font-black uppercase tracking-[0.2em] text-navy-deep/30 ml-2">{t('id_proof')}</label>
+                                            <div className="relative group">
+                                                <input
+                                                    type="file"
+                                                    name="idProof"
+                                                    onChange={handleChange}
+                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                    required
+                                                    accept="image/*,application/pdf"
+                                                />
+                                                <div className="input-field text-[10px] flex items-center justify-between group-hover:border-royal-gold transition-colors">
+                                                    <span className="truncate">
+                                                        {formData.idProof ? formData.idProof.name : t('id_link_placeholder')}
+                                                    </span>
+                                                    <FaCloudUploadAlt className="text-royal-gold/40 group-hover:text-royal-gold transition-colors" />
+                                                </div>
+                                            </div>
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-[8px] font-black uppercase tracking-[0.2em] text-navy-deep/30 ml-2">{t('portfolio_links_comma')}</label>
