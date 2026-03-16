@@ -1,9 +1,13 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaHeadset, FaPaperPlane, FaCheckCircle, FaExclamationTriangle, FaHistory, FaChevronRight } from 'react-icons/fa';
 
+import { useTranslation } from 'react-i18next';
+
 const RaiseComplaint = () => {
+    const { t } = useTranslation();
+    if (!t) return null;
     const [subject, setSubject] = useState('');
     const [message, setMessage] = useState('');
     const [type, setType] = useState('other');
@@ -14,10 +18,7 @@ const RaiseComplaint = () => {
 
     const fetchMyTickets = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/support/my-tickets`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const { data } = await api.get('/support/my-tickets');
             setTickets(data);
         } catch (_) { }
     };
@@ -27,11 +28,8 @@ const RaiseComplaint = () => {
         setLoading(true);
         setStatus(null);
         try {
-            const token = localStorage.getItem('token');
-            await axios.post(`${import.meta.env.VITE_API_URL}/api/support`, {
+            await api.post('/support', {
                 subject, message, type
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
             setStatus({ type: 'success', text: 'Support request submitted successfully!' });
             setSubject('');
