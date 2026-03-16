@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from './api';
 
 const publicVapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
@@ -19,13 +19,12 @@ export const subscribeToNotifications = async () => {
         }
 
         // Send subscription to backend
-        const token = localStorage.getItem('token');
-        await axios.post(`${import.meta.env.VITE_API_URL}/api/notifications/subscribe`,
-            { subscription },
-            { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await api.post('/notifications/subscribe', { subscription });
 
-        console.log('Push subscription successful');
+        if (!window._pushSubscribed) {
+            console.log('Push subscription successful');
+            window._pushSubscribed = true;
+        }
     } catch (error) {
         console.error('Push subscription failed:', error);
     }
