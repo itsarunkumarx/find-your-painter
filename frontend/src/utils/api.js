@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 const rawBaseURL = import.meta.env.VITE_API_URL || '';
-// Normalize URL: remove trailing slashes and common mistake suffixes, then add exactly one /api
-const cleanBaseURL = `${rawBaseURL.replace(/\/+$/, '').replace(/\/api$/, '')}/api`;
+// Aggressively remove any trailing slashes and any number of /api suffixes, then add exactly one.
+const cleanBaseURL = `${rawBaseURL.replace(/\/+$/, '').replace(/(\/api)+$/, '')}/api`;
 
 const api = axios.create({
     baseURL: cleanBaseURL,
