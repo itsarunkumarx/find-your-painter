@@ -1,5 +1,5 @@
 import express from 'express';
-import { updateProfile, updatePreferences, getProfile, toggleSaveWorker, getSavedWorkers, getUserStats, addToRecentlyViewed, getRecentlyViewed } from '../controllers/user.controller.js';
+import { updateProfile, updatePreferences, getProfile, toggleSaveWorker, getSavedWorkers, getUserStats, addToRecentlyViewed, getRecentlyViewed, getUserDashboardData } from '../controllers/user.controller.js';
 import { protect } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
@@ -12,5 +12,6 @@ router.get('/stats', protect, getUserStats);
 
 router.get('/recently-viewed', protect, getRecentlyViewed);
 router.put('/recently-viewed/:workerId', protect, addToRecentlyViewed);
+router.get('/dashboard-data', protect, getUserDashboardData);
 
 export default router;
