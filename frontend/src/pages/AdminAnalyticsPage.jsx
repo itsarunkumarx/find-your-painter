@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { motion } from 'framer-motion';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -7,16 +7,18 @@ import {
 } from 'recharts';
 import { FaUsers, FaTrophy, FaChartLine, FaMapMarkerAlt, FaPaintBrush } from 'react-icons/fa';
 
+import { useTranslation } from 'react-i18next';
+
 const COLORS = ['#D4AF37', '#0D1B2A', '#f59e0b', '#10b981', '#6366f1', '#ec4899'];
 
 const AdminAnalyticsPage = () => {
+    const { t } = useTranslation();
+    if (!t) return null;
     const [stats, setStats] = useState(null);
     const [workers, setWorkers] = useState([]);
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const token = localStorage.getItem('token');
-    const config = { headers: { Authorization: `Bearer ${token}` } };
 
     const [serviceTypes, setServiceTypes] = useState([]);
 
@@ -24,10 +26,10 @@ const AdminAnalyticsPage = () => {
         const fetch = async () => {
             try {
                 const [statsRes, workersRes, bookingsRes, serviceRes] = await Promise.all([
-                    axios.get(`${import.meta.env.VITE_API_URL}/api/admin/stats`, config),
-                    axios.get(`${import.meta.env.VITE_API_URL}/api/admin/workers`, config),
-                    axios.get(`${import.meta.env.VITE_API_URL}/api/admin/bookings`, config),
-                    axios.get(`${import.meta.env.VITE_API_URL}/api/admin/service-breakdown`, config),
+                    api.get('/admin/stats'),
+                    api.get('/admin/workers'),
+                    api.get('/admin/bookings'),
+                    api.get('/admin/service-breakdown'),
                 ]);
                 setStats(statsRes.data);
                 setWorkers(workersRes.data);
@@ -79,20 +81,20 @@ const AdminAnalyticsPage = () => {
         <div className="space-y-8 pb-12">
             <div>
                 <h1 className="text-3xl font-black text-navy-deep tracking-tight">
-                    Platform <span className="text-royal-gold">Analytics</span>
+                    {t('platform_analytics').split(' ')[0]} <span className="text-royal-gold">{t('platform_analytics').split(' ')[1]}</span>
                 </h1>
                 <p className="text-slate-400 text-xs uppercase tracking-widest mt-1 font-bold">
-                    Live intelligence across all regions & services
+                    {t('live_intel')}
                 </p>
             </div>
 
             {/* KPI Row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                    { label: 'Total Users', value: stats?.users || 0, icon: FaUsers, color: 'text-blue-500' },
-                    { label: 'Verified Painters', value: stats?.workers || 0, icon: FaPaintBrush, color: 'text-royal-gold' },
-                    { label: 'Active Jobs', value: stats?.activeJobs || 0, icon: FaChartLine, color: 'text-green-500' },
-                    { label: 'Platform Revenue', value: `₹${(stats?.totalValue || 0).toLocaleString('en-IN')}`, icon: FaTrophy, color: 'text-purple-500' },
+                    { label: t('total_users_kpi'), value: stats?.users || 0, icon: FaUsers, color: 'text-blue-500' },
+                    { label: t('verified_painters_kpi'), value: stats?.workers || 0, icon: FaPaintBrush, color: 'text-royal-gold' },
+                    { label: t('active_jobs_kpi'), value: stats?.activeJobs || 0, icon: FaChartLine, color: 'text-green-500' },
+                    { label: t('platform_revenue_kpi'), value: `₹${(stats?.totalValue || 0).toLocaleString('en-IN')}`, icon: FaTrophy, color: 'text-purple-500' },
                 ].map((kpi, i) => (
                     <motion.div key={kpi.label} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
                         className="bg-white rounded-[2rem] border border-royal-gold/10 p-6 shadow-sm">
@@ -105,7 +107,7 @@ const AdminAnalyticsPage = () => {
 
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <ChartCard title="Weekly Booking Trend">
+                <ChartCard title={t('weekly_trend')}>
                     <ResponsiveContainer width="100%" height={220}>
                         <BarChart data={weeklyTrend} barSize={28}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -117,7 +119,7 @@ const AdminAnalyticsPage = () => {
                     </ResponsiveContainer>
                 </ChartCard>
 
-                <ChartCard title="Service Type Breakdown">
+                <ChartCard title={t('service_breakdown')}>
                     <div className="flex items-center gap-4">
                         <ResponsiveContainer width="50%" height={200}>
                             <PieChart>
@@ -141,9 +143,9 @@ const AdminAnalyticsPage = () => {
             </div>
 
             {/* Top Workers Leaderboard */}
-            <ChartCard title="Top Earning Painters — Leaderboard">
+            <ChartCard title={t('top_earners_leaderboard')}>
                 {topWorkers.length === 0 ? (
-                    <p className="text-slate-300 text-xs font-black uppercase tracking-widest py-8 text-center">No completed jobs yet</p>
+                    <p className="text-slate-300 text-xs font-black uppercase tracking-widest py-8 text-center">{t('no_jobs_completed')}</p>
                 ) : (
                     <div className="space-y-3">
                         {topWorkers.map((w, i) => (
@@ -154,7 +156,7 @@ const AdminAnalyticsPage = () => {
                                 <div className="flex-1">
                                     <p className="text-xs font-black text-navy-deep">{w.name}</p>
                                     <div className="flex gap-4 mt-0.5">
-                                        <span className="text-[9px] font-bold text-slate-400">{w.jobs} jobs</span>
+                                        <span className="text-[9px] font-bold text-slate-400">{w.jobs} {t('jobs_count_label')}</span>
                                         <span className="text-[9px] font-bold text-royal-gold">★ {w.rating?.toFixed(1) || 'N/A'}</span>
                                     </div>
                                 </div>
@@ -166,17 +168,17 @@ const AdminAnalyticsPage = () => {
             </ChartCard>
 
             {/* Booking Funnel */}
-            <ChartCard title="Booking Conversion Funnel">
+            <ChartCard title={t('booking_funnel')}>
                 {(() => {
                     const total = bookings.length || 1;
                     const pending = bookings.filter(b => b.status === 'pending').length;
                     const accepted = bookings.filter(b => b.status === 'accepted').length;
                     const completed = bookings.filter(b => b.status === 'completed').length;
                     const funnel = [
-                        { stage: 'Requested', count: total, pct: 100 },
-                        { stage: 'Accepted', count: pending + accepted + completed, pct: Math.round(((pending + accepted + completed) / total) * 100) },
-                        { stage: 'In Progress', count: accepted + completed, pct: Math.round(((accepted + completed) / total) * 100) },
-                        { stage: 'Completed', count: completed, pct: Math.round((completed / total) * 100) },
+                        { stage: t('funnel_requested'), count: total, pct: 100 },
+                        { stage: t('funnel_accepted'), count: pending + accepted + completed, pct: Math.round(((pending + accepted + completed) / total) * 100) },
+                        { stage: t('funnel_in_progress'), count: accepted + completed, pct: Math.round(((accepted + completed) / total) * 100) },
+                        { stage: t('funnel_completed'), count: completed, pct: Math.round((completed / total) * 100) },
                     ];
                     return (
                         <div className="space-y-3">
