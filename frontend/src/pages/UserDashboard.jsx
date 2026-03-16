@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
+import api from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import {
@@ -14,6 +14,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
 import WorkerCard from '../components/WorkerCard';
+import { toast } from 'react-hot-toast';
 
 const StatCard = ({ icon: Icon, label, value, color, delay }) => (
     <motion.div
@@ -21,13 +22,13 @@ const StatCard = ({ icon: Icon, label, value, color, delay }) => (
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay }}
         whileHover={{ y: -5 }}
-        className="glass-card p-7 shadow-[0_10px_40px_-15px_rgba(212,175,55,0.08)] hover:shadow-[0_20px_50px_-10px_rgba(212,175,55,0.15)] transition-all group"
+        className="glass-card p-5 sm:p-7 shadow-[0_10px_40px_-15px_rgba(212,175,55,0.08)] hover:shadow-[0_20px_50px_-10px_rgba(212,175,55,0.15)] transition-all group"
     >
-        <div className={`w-14 h-14 rounded-2xl ${color} flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform shadow-inner`}>
+        <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl ${color} flex items-center justify-center text-xl sm:text-2xl mb-4 sm:mb-5 group-hover:scale-110 transition-transform shadow-inner`}>
             <Icon />
         </div>
-        <p className="text-[var(--text-muted)] text-[9px] font-black uppercase tracking-[0.2em]">{label}</p>
-        <h3 className="text-3xl font-black text-[var(--text-main)] mt-1 leading-none">{value}</h3>
+        <p className="text-[var(--text-muted)] text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em]">{label}</p>
+        <h3 className="text-2xl sm:text-3xl font-black text-[var(--text-main)] mt-1 leading-none">{value}</h3>
     </motion.div>
 );
 
@@ -43,48 +44,76 @@ const UserDashboard = () => {
     const [savedIds, setSavedIds] = useState([]);
     const [elitePainters, setElitePainters] = useState([]);
     const [workerProfile, setWorkerProfile] = useState(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const navigate = useNavigate();
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                if (!token) {
-                    setLoading(false);
-                    return;
-                }
-                const config = { headers: { Authorization: `Bearer ${token}` } };
-                const [workersRes, bookingsRes, workerStatsRes, userStatsRes, savedRes, recentRes, profileRes] = await Promise.all([
-                    axios.get(`${import.meta.env.VITE_API_URL}/api/workers`, config).catch(() => ({ data: [] })),
-                    axios.get(`${import.meta.env.VITE_API_URL}/api/bookings/my-bookings`, config).catch(() => ({ data: [] })),
-                    axios.get(`${import.meta.env.VITE_API_URL}/api/workers/stats`, config).catch(() => ({ data: null })),
-                    axios.get(`${import.meta.env.VITE_API_URL}/api/users/stats`, config).catch(() => ({ data: null })),
-                    axios.get(`${import.meta.env.VITE_API_URL}/api/users/saved-painters`, config).catch(() => ({ data: [] })),
-                    axios.get(`${import.meta.env.VITE_API_URL}/api/users/recently-viewed`, config).catch(() => ({ data: [] })),
-                    axios.get(`${import.meta.env.VITE_API_URL}/api/workers/profile`, config).catch(() => ({ data: null })),
-                ]);
-                setWorkers(workersRes.data);
-                setBookings(bookingsRes.data);
-                setStatsData(workerStatsRes.data);
-                setUserStats(userStatsRes.data);
-                setSavedIds((savedRes.data || []).map(w => w._id));
-                setRecentWorkers(recentRes.data || []);
-                setElitePainters((workersRes.data || []).slice(0, 4));
-                setWorkerProfile(profileRes.data);
-            } catch (error) {
-                console.error('Fetch error', error);
-            } finally {
-                setLoading(false);
+    const handleUnlockElite = () => {
+        toast.promise(
+            new Promise((resolve) => setTimeout(resolve, 1500)),
+            {
+                loading: t('initializing_elite_protocol') || 'Initializing Elite Protocol...',
+                success: t('elite_access_granted') || 'Elite access request transmitted. Our curators will review your standing.',
+                error: t('elite_access_denied') || 'Elite status could not be established.',
+            },
+            {
+                style: {
+                    minWidth: '300px',
+                    borderRadius: '1rem',
+                    background: '#0F172A',
+                    color: '#D4AF37',
+                    border: '1px solid rgba(212,175,55,0.2)',
+                    fontWeight: '900',
+                    textTransform: 'uppercase',
+                    fontSize: '10px',
+                    letterSpacing: '0.1em'
+                },
+                success: {
+                    duration: 5000,
+                    icon: '👑',
+                },
             }
-        };
+        );
+    };
+
+    const fetchData = async (showLoading = true) => {
+        if (showLoading) setLoading(true);
+        else setIsRefreshing(true);
+        try {
+            const res = await api.get('/users/dashboard-data');
+            const data = res.data;
+            
+            setWorkers(data.workers);
+            setBookings(data.bookings);
+            setStatsData(data.workerStats);
+            setUserStats(data.userStats);
+            setSavedIds(data.user.savedWorkers.map(w => w._id));
+            setRecentWorkers(data.user.recentlyViewed);
+            setElitePainters((data.workers || []).slice(0, 4));
+            setWorkerProfile(data.workerProfile);
+        } catch (error) {
+            console.error('Fetch error', error);
+        } finally {
+            setLoading(false);
+            setIsRefreshing(false);
+        }
+    };
+
+    useEffect(() => {
         fetchData();
+        
+        // Auto-refresh every 60 seconds
+        const interval = setInterval(() => {
+            fetchData(false);
+        }, 60000);
+
+        return () => clearInterval(interval);
     }, []);
 
     const stats = [
-        { label: 'Total Experts', value: statsData?.totalVerified || 0, icon: FaUserTie, color: 'bg-royal-gold/10 text-royal-gold', delay: 0.1 },
-        { label: 'Ready Now', value: statsData?.available || 0, icon: FaCheckCircle, color: 'bg-green-500/10 text-green-500', delay: 0.2 },
-        { label: 'My Projects', value: userStats?.totalProjects || bookings.length, icon: FaCalendarCheck, color: 'bg-royal-gold/10 text-royal-gold', delay: 0.3 },
-        { label: 'Active Jobs', value: userStats?.activeProjects || bookings.filter(b => ['pending', 'accepted'].includes(b.status)).length, icon: FaClock, color: 'bg-yellow-500/10 text-yellow-600', delay: 0.4 },
+        { label: t('total_experts_stat'), value: statsData?.totalVerified || 0, icon: FaUserTie, color: 'bg-royal-gold/10 text-royal-gold', delay: 0.1 },
+        { label: t('ready_now_stat'), value: statsData?.available || 0, icon: FaCheckCircle, color: 'bg-green-500/10 text-green-500', delay: 0.2 },
+        { label: t('my_projects_stat'), value: userStats?.totalProjects || bookings.length, icon: FaCalendarCheck, color: 'bg-royal-gold/10 text-royal-gold', delay: 0.3 },
+        { label: t('active_jobs_stat'), value: userStats?.activeProjects || bookings.filter(b => ['pending', 'accepted'].includes(b.status)).length, icon: FaClock, color: 'bg-yellow-500/10 text-yellow-600', delay: 0.4 },
     ];
 
     const totalSpent = userStats?.totalSpent || 0;
@@ -97,52 +126,69 @@ const UserDashboard = () => {
 
     return (
         <div className="space-y-10 pb-12">
-            {/* Cinematic Welcome Section */}
-            <div className="relative overflow-hidden glass-card p-10 shadow-2xl shadow-royal-gold/5">
-                <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-royal-gold/5 rounded-full blur-[100px] -z-10 translate-x-1/2 -translate-y-1/2" />
-                <div className="absolute bottom-0 left-0 w-[200px] h-[200px] bg-royal-gold/5 rounded-full blur-[80px] -z-10 -translate-x-1/2 translate-y-1/2" />
-
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-3 text-royal-gold font-black uppercase tracking-[0.4em] text-[10px]">
-                            <FaCrown className="animate-bounce" /> {t('security_trust')} Portal
-                        </div>
-                        <h1 className="text-4xl md:text-5xl font-black text-[var(--text-main)] tracking-tight leading-tight">
-                            {user?.role === 'worker' ? t('welcome_back_worker') : t('welcome_back_user')}, <br />
-                            <span className="bg-gradient-to-r from-royal-gold-deep via-royal-gold to-royal-gold-light bg-clip-text text-transparent">
-                                {user?.name}
-                            </span>
-                        </h1>
-                        <p className="text-[var(--text-muted)] text-sm font-medium max-w-md">Architecture your perfect home with our curated fleet of verified painting specialists.</p>
-                    </div>
-
-                    <div className="flex gap-4 items-center">
-                        <div className="p-6 bg-[var(--bg-highlight)]/50 rounded-[2rem] border border-royal-gold/5 text-center px-8 shadow-inner">
-                            <span className="block text-[8px] font-black uppercase tracking-[0.3em] text-royal-gold mb-1">Total Spent</span>
-                            <span className="text-xl font-black text-[var(--text-main)]">₹{totalSpent.toLocaleString('en-IN')}</span>
-                        </div>
-                        <button onClick={() => navigate('/explore')} className="btn-primary flex items-center gap-4 group">
-                            Book a Painter <FaBolt className="group-hover:animate-pulse" />
-                        </button>
-                    </div>
-                </div>
-            </div>
-
             {/* Quick Intelligence Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-                {stats.map((stat, i) => <StatCard key={i} {...stat} />)}
+            <div className="space-y-4">
+                <div className="flex items-center justify-between px-2">
+                    <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-royal-gold">{t('intel_briefing')}</h2>
+                    <AnimatePresence>
+                        {isRefreshing && (
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.9 }}
+                                className="flex items-center gap-2 text-[8px] font-black uppercase tracking-widest text-royal-gold/60"
+                            >
+                                <div className="w-1 h-1 rounded-full bg-royal-gold animate-ping" />
+                                {t('syncing_data')}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                    {stats.map((stat, i) => <StatCard key={i} {...stat} />)}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
                 <div className="xl:col-span-2 space-y-10">
                     <div className="space-y-8">
                         {/* Worker Status CTA / Badge */}
-                        {user.role === 'user' && (
-                            <div className="glass-card p-10 border-royal-gold/10 relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-royal-gold/5 rounded-full blur-2xl" />
-                                <div className="flex flex-col md:flex-row items-center justify-between gap-8 relative z-10">
+                        {/* Worker Status / Verification Success Notification */}
+                        {user.role === 'worker' ? (
+                            <motion.div 
+                                initial={{ opacity: 0, y: -20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="glass-card p-8 sm:p-12 border-green-500/30 bg-green-500/5 relative overflow-hidden group mb-10"
+                            >
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/5 rounded-full blur-3xl" />
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-10 relative z-10">
                                     <div className="flex items-center gap-6">
-                                        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-2xl shadow-inner ${workerProfile?.verificationStatus === 'pending' ? 'bg-royal-gold/10 text-royal-gold' :
+                                        <div className="w-20 h-20 rounded-[2.5rem] bg-green-500/10 flex items-center justify-center text-3xl text-green-500 shadow-lg shadow-green-500/10">
+                                            <FaCheckCircle className="animate-bounce" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-2xl font-black text-[var(--text-main)] uppercase tracking-[0.1em]">
+                                                {t('identity_authenticated') || 'Identity Authenticated'}
+                                            </h3>
+                                            <p className="text-[10px] font-black text-green-500 uppercase tracking-[0.4em] mt-2">
+                                                {t('credentials_verified_msg') || 'Your expert credentials have been verified by the Administrative Layer.'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => navigate('/worker-dashboard')}
+                                        className="w-full sm:w-auto px-10 py-5 bg-navy-deep text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center gap-3"
+                                    >
+                                        {t('access_worker_hq') || 'Access Expert HQ'} <FaChevronRight />
+                                    </button>
+                                </div>
+                            </motion.div>
+                        ) : (
+                            <div className="glass-card p-6 sm:p-10 border-royal-gold/10 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-royal-gold/5 rounded-full blur-2xl" />
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-8 relative z-10">
+                                    <div className="flex items-center gap-4 sm:gap-6 w-full sm:w-auto">
+                                        <div className={`w-14 h-14 sm:w-16 h-16 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl sm:text-2xl shadow-inner shrink-0 ${workerProfile?.verificationStatus === 'pending' ? 'bg-royal-gold/10 text-royal-gold' :
                                             workerProfile?.verificationStatus === 'rejected' ? 'bg-red-500/10 text-red-500' :
                                                 'bg-navy-deep/5 text-navy-deep'
                                             }`}>
@@ -152,14 +198,14 @@ const UserDashboard = () => {
                                         </div>
                                         <div>
                                             <h3 className="text-xl font-black text-[var(--text-main)] uppercase tracking-tighter">
-                                                {workerProfile?.verificationStatus === 'pending' ? 'Application Under Review' :
-                                                    workerProfile?.verificationStatus === 'rejected' ? 'Verification Rejected' :
-                                                        'Become a Professional'}
+                                                {workerProfile?.verificationStatus === 'pending' ? t('app_under_review') :
+                                                    workerProfile?.verificationStatus === 'rejected' ? t('verif_rejected_title') :
+                                                        t('become_pro_title')}
                                             </h3>
                                             <p className="text-[10px] font-black text-royal-gold uppercase tracking-[0.4em] mt-1">
-                                                {workerProfile?.verificationStatus === 'pending' ? 'Syncing credentials with HQ' :
-                                                    workerProfile?.verificationStatus === 'rejected' ? 'Administrative Directive Required' :
-                                                        'Monetize your artistic talent'}
+                                                {workerProfile?.verificationStatus === 'pending' ? t('syncing_hq_desc') :
+                                                    workerProfile?.verificationStatus === 'rejected' ? t('admin_directive_desc') :
+                                                        t('monetize_talent_desc')}
                                             </p>
                                         </div>
                                     </div>
@@ -167,16 +213,16 @@ const UserDashboard = () => {
                                     {workerProfile ? (
                                         <button
                                             onClick={() => navigate('/worker-verification')}
-                                            className="px-8 py-4 bg-[var(--bg-highlight)] text-[var(--text-main)] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-royal-gold/10 transition-colors border border-royal-gold/5"
+                                            className="w-full sm:w-auto px-8 py-4 bg-[var(--bg-highlight)] text-[var(--text-main)] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-royal-gold/10 transition-colors border border-royal-gold/5"
                                         >
-                                            View Status
+                                            {t('view_status_btn')}
                                         </button>
                                     ) : (
                                         <button
                                             onClick={() => navigate('/become-painter')}
-                                            className="btn-primary group"
+                                            className="w-full sm:w-auto btn-primary group flex items-center justify-center"
                                         >
-                                            Apply Now <FaChevronRight className="group-hover:translate-x-1 transition-transform" />
+                                            {t('apply_now_btn')} <FaChevronRight className="group-hover:translate-x-1 transition-transform" />
                                         </button>
                                     )}
                                 </div>
@@ -184,13 +230,13 @@ const UserDashboard = () => {
                         )}
 
                         {/* Discovery CTA Section */}
-                        <div className="glass-card p-12 shadow-2xl shadow-royal-gold/5 flex flex-col md:flex-row items-center justify-between gap-10">
-                            <div className="space-y-4">
-                                <h2 className="text-3xl font-black text-[var(--text-main)] uppercase tracking-tighter leading-none">Discover New <br /><span className="text-royal-gold">Artistry</span></h2>
-                                <p className="text-[var(--text-muted)] text-sm font-medium max-w-sm">Access our full directory of verified painters, filtered by skill and location to match your vision.</p>
+                        <div className="glass-card p-8 sm:p-12 shadow-2xl shadow-royal-gold/5 flex flex-col md:flex-row items-center justify-between gap-10">
+                            <div className="space-y-4 text-center md:text-left">
+                                <h2 className="text-2xl sm:text-3xl font-black text-[var(--text-main)] uppercase tracking-tighter leading-none">{t('discover_artistry_title')}</h2>
+                                <p className="text-[var(--text-muted)] text-xs sm:text-sm font-medium max-w-sm">{t('access_directory_desc')}</p>
                             </div>
-                            <Link to="/explore" className="btn-primary px-12 py-6 rounded-3xl flex items-center gap-4">
-                                Explore All Experts <FaChevronRight />
+                            <Link to="/explore" className="w-full md:w-auto btn-primary px-10 py-5 sm:px-12 sm:py-6 rounded-2xl sm:rounded-3xl flex items-center justify-center gap-4 text-sm">
+                                {t('explore_experts_btn')} <FaChevronRight />
                             </Link>
                         </div>
 
@@ -198,22 +244,22 @@ const UserDashboard = () => {
                         <section>
                             <div className="flex items-center justify-between mb-8">
                                 <div>
-                                    <h2 className="text-xl font-black text-[var(--text-main)] uppercase tracking-tighter">Elite Spotlight</h2>
-                                    <p className="text-[10px] font-black text-royal-gold uppercase tracking-[0.3em]">Handpicked Master Craftsmen</p>
+                                    <h2 className="text-xl font-black text-[var(--text-main)] uppercase tracking-tighter">{t('elite_spotlight_title')}</h2>
+                                    <p className="text-[10px] font-black text-royal-gold uppercase tracking-[0.3em]">{t('handpicked_masters_desc')}</p>
                                 </div>
-                                <button onClick={() => navigate('/explore')} className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] hover:text-royal-gold transition-colors">View All Professionals</button>
+                                <button onClick={() => navigate('/explore')} className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] hover:text-royal-gold transition-colors">{t('view_all_pros_btn')}</button>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                                 {elitePainters.map((worker, i) => (
                                     <motion.div key={worker._id}
                                         initial={{ opacity: 0, y: 20 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: 0.4 + i * 0.1 }}
                                         onClick={() => navigate(`/painter/${worker._id}`)}
-                                        className="group cursor-pointer glass-card p-6 hover:shadow-xl hover:shadow-royal-gold/5 transition-all">
-                                        <img src={worker.user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${worker.user?.name}`} className="w-full h-40 object-cover rounded-2xl mb-4 grayscale group-hover:grayscale-0 transition-all duration-500" alt={worker.user?.name} />
-                                        <h3 className="text-sm font-black text-[var(--text-main)]">{worker.user?.name}</h3>
-                                        <p className="text-[9px] font-bold text-[var(--text-muted)] uppercase mt-1">{worker.location}</p>
+                                        className="group cursor-pointer glass-card p-4 sm:p-6 hover:shadow-xl hover:shadow-royal-gold/5 transition-all">
+                                        <img src={worker.user?.profileImage || "/assets/premium-avatar.png"} className="w-full h-28 sm:h-40 object-cover rounded-xl sm:rounded-2xl mb-3 sm:mb-4 grayscale group-hover:grayscale-0 transition-all duration-500" alt={worker.user?.name} />
+                                        <h3 className="text-[10px] sm:text-sm font-black text-[var(--text-main)] truncate">{worker.user?.name}</h3>
+                                        <p className="text-[7px] sm:text-[9px] font-bold text-[var(--text-muted)] uppercase mt-0.5 sm:mt-1 truncate">{worker.location}</p>
                                     </motion.div>
                                 ))}
                             </div>
@@ -224,26 +270,26 @@ const UserDashboard = () => {
                             <section>
                                 <div className="flex items-center justify-between mb-8">
                                     <div>
-                                        <h2 className="text-xl font-black text-[var(--text-main)] uppercase tracking-tighter">Recently Viewed</h2>
-                                        <p className="text-[10px] font-black text-royal-gold uppercase tracking-[0.3em]">Continue your search</p>
+                                        <h2 className="text-xl font-black text-[var(--text-main)] uppercase tracking-tighter">{t('recently_viewed_title')}</h2>
+                                        <p className="text-[10px] font-black text-royal-gold uppercase tracking-[0.3em]">{t('continue_search_desc')}</p>
                                     </div>
                                 </div>
-                                <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-hide">
+                                <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-4 scrollbar-hide">
                                     {recentWorkers.map((worker, i) => (
                                         <motion.div key={worker._id}
                                             initial={{ opacity: 0, scale: 0.9 }}
                                             animate={{ opacity: 1, scale: 1 }}
                                             transition={{ delay: i * 0.1 }}
                                             onClick={() => navigate(`/painter/${worker._id}`)}
-                                            className="shrink-0 w-48 group cursor-pointer glass-card p-5 hover:shadow-lg transition-all">
+                                            className="shrink-0 w-36 sm:w-48 group cursor-pointer glass-card p-4 sm:p-5 hover:shadow-lg transition-all">
                                             <div className="relative">
-                                                <img src={worker.user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${worker.user?.name}`} className="w-full h-32 object-cover rounded-xl mb-3" alt={worker.user?.name} />
+                                                <img src={worker.user?.profileImage || "/assets/premium-avatar.png"} className="w-full h-24 sm:h-32 object-cover rounded-xl mb-3" alt={worker.user?.name} />
                                                 <div className="absolute inset-0 bg-black/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                     <FaBolt className="text-white" />
                                                 </div>
                                             </div>
-                                            <h3 className="text-xs font-black text-[var(--text-main)] truncate">{worker.user?.name}</h3>
-                                            <p className="text-[8px] font-bold text-[var(--text-muted)] uppercase mt-1">{worker.location}</p>
+                                            <h3 className="text-[10px] sm:text-xs font-black text-[var(--text-main)] truncate">{worker.user?.name}</h3>
+                                            <p className="text-[7px] sm:text-[8px] font-bold text-[var(--text-muted)] uppercase mt-1 truncate">{worker.location}</p>
                                         </motion.div>
                                     ))}
                                 </div>
@@ -255,17 +301,17 @@ const UserDashboard = () => {
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="glass-card p-10 shadow-2xl shadow-royal-gold/5"
+                                className="glass-card p-6 sm:p-10 shadow-2xl shadow-royal-gold/5"
                             >
-                                <div className="flex items-center gap-4 mb-8">
-                                    <div className="w-1.5 h-8 bg-royal-gold rounded-full" />
+                                <div className="flex items-center gap-4 mb-6 sm:mb-8">
+                                    <div className="w-1.5 h-6 sm:h-8 bg-royal-gold rounded-full" />
                                     <div>
-                                        <h3 className="text-lg font-black text-[var(--text-main)] uppercase tracking-tighter">Market Intelligence</h3>
-                                        <p className="text-[10px] font-black text-royal-gold uppercase tracking-[0.3em]">Expertise Distribution</p>
+                                        <h3 className="text-base sm:text-lg font-black text-[var(--text-main)] uppercase tracking-tighter">{t('market_intel_title')}</h3>
+                                        <p className="text-[8px] sm:text-[10px] font-black text-royal-gold uppercase tracking-[0.3em]">{t('expertise_dist_desc')}</p>
                                     </div>
                                 </div>
                                 <div className="h-[300px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                    <ResponsiveContainer width="100%" height={300}>
                                         <BarChart data={statsData.expertiseData}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--glass-border)" opacity={0.1} />
                                             <XAxis
@@ -304,14 +350,14 @@ const UserDashboard = () => {
 
                 {/* Right Column: Timeline & Premium */}
                 <div className="space-y-10">
-                    <div className="glass-card p-10 shadow-2xl shadow-royal-gold/5 relative overflow-hidden">
+                    <div className="glass-card p-6 sm:p-10 shadow-2xl shadow-royal-gold/5 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-24 h-24 bg-royal-gold/5 rounded-full blur-2xl" />
-                        <div className="flex items-center justify-between mb-10">
+                        <div className="flex items-center justify-between mb-8 sm:mb-10">
                             <div>
-                                <h3 className="text-lg font-black text-[var(--text-main)] tracking-tight uppercase">Activity Stream</h3>
-                                <p className="text-[8px] font-black text-royal-gold uppercase tracking-[0.4em] mt-1">Live Deployment</p>
+                                <h3 className="text-base sm:text-lg font-black text-[var(--text-main)] tracking-tight uppercase">{t('activity_stream_title')}</h3>
+                                <p className="text-[7px] sm:text-[8px] font-black text-royal-gold uppercase tracking-[0.4em] mt-1">{t('live_deployment_desc')}</p>
                             </div>
-                            <div className="text-[8px] font-black text-royal-gold uppercase tracking-[0.4em] bg-royal-gold/5 px-3 py-1 rounded-full">Automated Stream</div>
+                            <div className="text-[7px] sm:text-[8px] font-black text-royal-gold uppercase tracking-[0.4em] bg-royal-gold/5 px-3 py-1 rounded-full">{t('automated_label') || 'Automated'}</div>
                         </div>
 
                         <div className="space-y-8 relative before:absolute before:left-7 before:top-2 before:bottom-2 before:w-[2px] before:bg-[var(--glass-border)]">
@@ -325,7 +371,7 @@ const UserDashboard = () => {
                                         <span className="text-[8px] font-black uppercase mt-1">{new Date(b.date).toLocaleString('en', { month: 'short' })}</span>
                                     </div>
                                     <div className="min-w-0 pt-2">
-                                        <h4 className="font-black text-[var(--text-main)] text-sm truncate group-hover:text-royal-gold transition-colors">{b.worker?.user?.name || 'Assigned Expert'}</h4>
+                                        <h4 className="font-black text-[var(--text-main)] text-sm truncate group-hover:text-royal-gold transition-colors">{b.worker?.user?.name || t('assigned_expert')}</h4>
                                         <div className="flex items-center gap-3 mt-1.5">
                                             <div className={`w-2 h-2 rounded-full ${b.status === 'accepted' ? 'bg-green-500' : 'bg-royal-gold animate-pulse'}`} />
                                             <p className="text-[9px] text-[var(--text-muted)] font-black uppercase tracking-[0.2em]">{b.status}</p>
@@ -338,22 +384,55 @@ const UserDashboard = () => {
                                     <div className="w-16 h-16 bg-[var(--bg-highlight)]/50 rounded-full flex items-center justify-center mx-auto mb-4 border border-royal-gold/5">
                                         <FaCalendarCheck className="text-royal-gold/20" />
                                     </div>
-                                    <p className="text-[var(--text-muted)] font-bold uppercase tracking-[0.2em] text-[10px]">No active deployments</p>
+                                    <p className="text-[var(--text-muted)] font-bold uppercase tracking-[0.2em] text-[10px]">{t('no_active_deployments')}</p>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    <div className="bg-[var(--text-main)] rounded-[3rem] p-10 text-[var(--bg-base)] relative shadow-2xl shadow-royal-gold/20">
-                        <div className="absolute top-0 right-0 p-8 opacity-10">
-                            <FaCrown className="text-6xl" />
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        whileInView={{ opacity: 1, scale: 1 }}
+                        viewport={{ once: true }}
+                        className="bg-navy-deep relative rounded-[2.5rem] sm:rounded-[3.5rem] p-8 sm:p-12 overflow-hidden shadow-2xl shadow-navy-deep/40 group"
+                    >
+                        {/* Animated Mesh Background */}
+                        <div className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity duration-1000">
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(212,175,55,0.3)_0%,transparent_70%)]" />
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-royal-gold/10 rounded-full blur-[100px] animate-pulse" />
                         </div>
-                        <h3 className="text-xl font-black tracking-tight mb-4">PainterPro<br /><span className="text-royal-gold">Elite Class</span></h3>
-                        <p className="opacity-60 text-xs font-medium leading-relaxed mb-8">Priority scheduling, expert site audits, and premium material discounts.</p>
-                        <button className="w-full py-4 bg-royal-gold text-[var(--text-main)] rounded-[1.25rem] font-black uppercase text-[10px] tracking-widest hover:brightness-110 transition-all">
-                            Unlock Elite
-                        </button>
-                    </div>
+
+                        <div className="relative z-10">
+                            <motion.div 
+                                animate={{ y: [0, -10, 0] }}
+                                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                                className="w-16 h-16 sm:w-20 sm:h-20 bg-white/5 border border-white/10 rounded-[2rem] flex items-center justify-center text-royal-gold mb-8 sm:mb-10 backdrop-blur-xl shadow-inner"
+                            >
+                                <FaCrown className="text-3xl sm:text-4xl filter drop-shadow-[0_0_10px_rgba(212,175,55,0.5)]" />
+                            </motion.div>
+
+                            <h3 className="text-3xl sm:text-4xl font-royal italic text-white mb-4 tracking-tight leading-none">
+                                {t('elite_class_title')}
+                            </h3>
+                            <p className="text-slate-400 text-xs sm:text-sm font-medium leading-relaxed mb-10 max-w-xs">
+                                {t('elite_benefits_desc')}
+                            </p>
+
+                            <motion.button 
+                                whileHover={{ scale: 1.02, y: -2 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={handleUnlockElite}
+                                className="w-full sm:w-auto px-10 py-5 bg-gradient-to-r from-royal-gold to-yellow-600 text-navy-deep rounded-2xl sm:rounded-[1.5rem] font-black uppercase text-[10px] sm:text-[11px] tracking-[0.25em] shadow-xl shadow-royal-gold/20 hover:shadow-royal-gold/40 transition-all flex items-center justify-center gap-3 overflow-hidden relative group/btn"
+                            >
+                                <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-700 ease-in-out" />
+                                <span className="relative z-10">{t('unlock_elite_btn')}</span>
+                                <FaChevronRight className="relative z-10 text-[8px] group-hover:translate-x-1 transition-transform" />
+                            </motion.button>
+                        </div>
+
+                        {/* Decorative Elements */}
+                        <div className="absolute -bottom-10 -right-10 w-40 h-40 border-[20px] border-royal-gold/5 rounded-full" />
+                    </motion.div>
                 </div>
             </div>
         </div>
