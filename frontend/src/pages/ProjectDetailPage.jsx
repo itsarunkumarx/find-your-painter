@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import axios from 'axios';
+import api from '../utils/api';
 import {
     FaArrowLeft, FaMapMarkerAlt, FaCalendarAlt, FaClock,
     FaCheckCircle, FaComments, FaInfoCircle, FaPaintRoller,
@@ -19,10 +19,7 @@ const ProjectDetailPage = () => {
     useEffect(() => {
         const fetchBooking = async () => {
             try {
-                const token = localStorage.getItem('token');
-                const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/bookings/my-bookings`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                const { data } = await api.get('/bookings/my-bookings');
                 const found = data.find(b => b._id === id);
                 setBooking(found);
             } catch (error) {
