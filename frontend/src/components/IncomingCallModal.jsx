@@ -1,9 +1,9 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaPhone, FaPhoneSlash, FaVideo, FaUserTie } from 'react-icons/fa';
+import { FaPhone, FaPhoneSlash, FaVideo, FaUserTie, FaVolumeMute } from 'react-icons/fa';
 import { useSocket } from '../context/SocketContext';
 
 const IncomingCallModal = () => {
-    const { incomingCall, acceptCall, rejectCall } = useSocket();
+    const { incomingCall, acceptCall, rejectCall, isAudioBlocked } = useSocket();
 
     if (!incomingCall) return null;
 
@@ -24,19 +24,20 @@ const IncomingCallModal = () => {
                 <motion.div
                     initial={{ scale: 0.8, opacity: 0, y: 100 }}
                     animate={{
-                        scale: 1,
+                        scale: [1, 1.02, 1],
                         opacity: 1,
                         y: 0,
-                        x: [0, -2, 2, -2, 2, 0] // Subtle shake
+                        x: [0, -4, 4, -4, 4, 0] // Enhanced shake
                     }}
                     exit={{ scale: 0.8, opacity: 0, y: 100 }}
                     transition={{
                         type: 'spring',
-                        damping: 25,
+                        damping: 20,
                         stiffness: 400,
-                        x: { duration: 0.5, repeat: Infinity, repeatType: 'loop' }
+                        scale: { duration: 0.5, repeat: Infinity },
+                        x: { duration: 0.3, repeat: Infinity }
                     }}
-                    className="relative bg-slate-900/90 rounded-[3rem] shadow-[0_0_100px_rgba(34,197,94,0.3)] w-full max-w-sm text-center overflow-hidden border border-white/20 backdrop-blur-2xl"
+                    className="relative bg-slate-900/95 rounded-[3.5rem] shadow-[0_0_150px_rgba(34,197,94,0.4)] w-full max-w-sm text-center overflow-hidden border border-white/30 backdrop-blur-3xl"
                 >
                     {/* Animated background patterns */}
                     <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
@@ -118,6 +119,18 @@ const IncomingCallModal = () => {
                                 <span className="text-[9px] font-black uppercase tracking-widest text-green-400">Accept</span>
                             </div>
                         </div>
+                        
+                        {/* Audio Blocked Alert */}
+                        {isAudioBlocked && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mt-6 flex items-center justify-center gap-2 bg-yellow-400/10 border border-yellow-400/20 px-4 py-2 rounded-full mx-10"
+                            >
+                                <FaVolumeMute className="text-yellow-400 animate-pulse text-xs" />
+                                <span className="text-[9px] font-black uppercase tracking-wider text-yellow-400">Ringtone blocked - tap to hear</span>
+                            </motion.div>
+                        )}
                     </div>
 
                     {/* Footer */}
