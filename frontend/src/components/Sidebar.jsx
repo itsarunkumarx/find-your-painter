@@ -3,14 +3,14 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
+import api from '../utils/api';
 import { io } from 'socket.io-client';
 import {
     FaHome, FaCalendarAlt, FaUser, FaSignOutAlt,
     FaBars, FaTimes, FaTachometerAlt, FaChartPie,
     FaUsers, FaShieldAlt, FaSearch, FaComments,
     FaBell, FaHeart, FaImages, FaRupeeSign,
-    FaChartBar, FaHeadset, FaInbox, FaStar, FaUserTie, FaMusic
+    FaChartBar, FaHeadset, FaInbox, FaStar, FaUserTie, FaMusic, FaHistory, FaCog
 } from 'react-icons/fa';
 
 const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
@@ -25,11 +25,9 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
         if (!user) return;
         const fetchCounts = async () => {
             try {
-                const token = localStorage.getItem('token');
-                const h = { headers: { Authorization: `Bearer ${token}` } };
                 const [chatRes, notifRes] = await Promise.all([
-                    axios.get(`${import.meta.env.VITE_API_URL}/api/chat/unread-count`, h),
-                    axios.get(`${import.meta.env.VITE_API_URL}/api/notifications/unread-count`, h),
+                    api.get('/chat/unread-count'),
+                    api.get('/notifications/unread-count'),
                 ]);
                 setUnreadCount(chatRes.data.total || 0);
                 setUnreadNotifs(notifRes.data.count || 0);
@@ -44,7 +42,7 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
 
         socket.on('new_message', (message) => {
             // Only increment if message is not from current user
-            if (message.sender._id !== user._id) {
+            if ((message.sender?._id || message.sender) !== user._id) {
                 setUnreadCount(prev => prev + 1);
             }
         });
@@ -54,12 +52,20 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
             fetchCounts();
         });
 
-        socket.on('new_notification', () => {
+        socket.on('new_notification', (data) => {
+            // If data contains userId, only increment if it matches
+            if (data.userId && data.userId !== user._id) return;
+            // If data contains targetRole (broadcast), only increment if it matches roles
+            if (data.targetRole && data.targetRole !== 'all' && data.targetRole !== user.role) return;
+            
             setUnreadNotifs(prev => prev + 1);
         });
 
+        window.addEventListener('notifications_read', fetchCounts);
+
         return () => {
             socket.disconnect();
+            window.removeEventListener('notifications_read', fetchCounts);
         };
     }, [user]);
 
@@ -68,38 +74,43 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
     const roleLinks = {
         user: [
             makeLink('/user-dashboard', <FaHome />, t('dashboard')),
-            makeLink('/explore', <FaSearch />, 'Explore Painters'),
-            makeLink('/my-bookings', <FaCalendarAlt />, 'My Bookings'),
-            makeLink('/saved-painters', <FaHeart />, 'Saved Painters'),
-            makeLink('/messages', <FaComments />, 'Messages', unreadCount),
-            makeLink('/notifications', <FaBell />, 'Notifications', unreadNotifs),
-            makeLink('/raise-complaint', <FaHeadset />, 'Support'),
-            makeLink('/audio-protocols', <FaMusic />, 'Audio Protocols'),
-            makeLink('/profile-settings', <FaUser />, t('profile')),
+            makeLink('/explore', <FaSearch />, t('nav_explore')),
+            makeLink('/my-bookings', <FaCalendarAlt />, t('nav_my_bookings')),
+            makeLink('/saved-painters', <FaHeart />, t('nav_saved_painters')),
+            makeLink('/messages', <FaComments />, t('nav_messages'), unreadCount),
+            makeLink('/notifications', <FaBell />, t('nav_notifications'), unreadNotifs),
+            makeLink('/call-history', <FaHistory />, t('nav_call_history')),
+            makeLink('/raise-complaint', <FaHeadset />, t('nav_support')),
+            makeLink('/audio-protocols', <FaMusic />, t('nav_audio_protocols')),
+            makeLink('/profile-settings', <FaUser />, t('nav_profile')),
         ],
         worker: [
             makeLink('/worker-dashboard', <FaTachometerAlt />, t('dashboard')),
-            makeLink('/worker-jobs', <FaInbox />, 'Active Jobs'),
-            makeLink('/messages', <FaComments />, 'Messages', unreadCount),
-            makeLink('/my-portfolio', <FaImages />, 'My Portfolio'),
-            makeLink('/earnings', <FaRupeeSign />, 'Earnings'),
-            makeLink('/worker-verification', <FaShieldAlt />, 'Verification'),
-            makeLink('/notifications', <FaBell />, 'Notifications', unreadNotifs),
-            makeLink('/raise-complaint', <FaHeadset />, 'Support'),
-            makeLink('/audio-protocols', <FaMusic />, 'Audio Protocols'),
-            makeLink('/worker-profile', <FaUser />, t('profile')),
+            makeLink('/worker-jobs', <FaInbox />, t('nav_my_jobs')),
+            makeLink('/messages', <FaComments />, t('nav_messages'), unreadCount),
+            makeLink('/my-portfolio', <FaImages />, t('nav_portfolio')),
+            makeLink('/earnings', <FaRupeeSign />, t('nav_earnings')),
+            makeLink('/worker-verification', <FaShieldAlt />, t('nav_verification')),
+            makeLink('/notifications', <FaBell />, t('nav_notifications'), unreadNotifs),
+            makeLink('/call-history', <FaHistory />, t('nav_call_history')),
+            makeLink('/raise-complaint', <FaHeadset />, t('nav_support')),
+            makeLink('/audio-protocols', <FaMusic />, t('nav_audio_protocols')),
+            makeLink('/worker-profile', <FaUser />, t('nav_profile')),
         ],
         admin: [
-            makeLink('/admin-dashboard', <FaChartPie />, 'Overview'),
-            makeLink('/admin-users', <FaUsers />, 'Manage Users'),
-            makeLink('/admin-workers', <FaUserTie />, 'Manage Workers'),
-            makeLink('/admin-analytics', <FaChartBar />, 'Analytics'),
-            makeLink('/admin-notifications', <FaBell />, 'Broadcast'),
-            makeLink('/admin-support', <FaHeadset />, 'Support Centre'),
-            makeLink('/messages', <FaComments />, 'Messages', unreadCount),
-            makeLink('/notifications', <FaBell />, 'Notifications', unreadNotifs),
-            makeLink('/audio-protocols', <FaMusic />, 'Audio Protocols'),
-            makeLink('/admin-profile', <FaUser />, t('profile')),
+            makeLink('/admin-dashboard', <FaChartPie />, t('nav_overview')),
+            makeLink('/admin-users', <FaUsers />, t('nav_manage_users')),
+            makeLink('/admin-workers', <FaUserTie />, t('nav_manage_workers')),
+            makeLink('/admin-analytics', <FaChartBar />, t('nav_analytics')),
+            makeLink('/admin-notifications', <FaBell />, t('nav_broadcast')),
+            makeLink('/admin-support', <FaHeadset />, t('nav_support_centre')),
+            makeLink('/audit-logs', <FaHistory />, t('nav_audit_logs')),
+            makeLink('/admin-settings', <FaCog />, t('nav_platform_settings')),
+            makeLink('/messages', <FaComments />, t('nav_messages'), unreadCount),
+            makeLink('/notifications', <FaBell />, t('nav_notifications'), unreadNotifs),
+            makeLink('/call-history', <FaHistory />, t('nav_call_history')),
+            makeLink('/audio-protocols', <FaMusic />, t('nav_audio_protocols')),
+            makeLink('/admin-profile', <FaUser />, t('nav_profile')),
         ],
     };
 
@@ -220,7 +231,7 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
                     <div className="p-4 border-t border-[var(--glass-border)] space-y-3">
                         <div className={`flex items-center gap-4 bg-[var(--bg-highlight)]/50 p-3 rounded-2xl border border-[var(--glass-border)] overflow-hidden ${(!isOpen && !isMobile) ? 'justify-center' : ''}`}>
                             <img
-                                src={user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name}`}
+                                src={user?.profileImage || "/assets/premium-avatar.png"}
                                 className="w-10 h-10 rounded-xl border border-royal-gold/20 shrink-0"
                                 alt="U"
                                 loading="lazy"
