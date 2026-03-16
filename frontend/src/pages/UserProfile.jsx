@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import axios from 'axios';
+import api from '../utils/api';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import {
@@ -29,16 +29,14 @@ const UserProfile = () => {
 
         setLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            const { data } = await axios.put(`${import.meta.env.VITE_API_URL}/api/users/profile`, {
+            const { data } = await api.put('/users/profile', {
                 name,
                 email,
                 phoneNumber,
                 address,
                 profileImage,
                 password: password || undefined
-            }, config);
+            });
 
             login(data);
             alert(t('profile_success') || 'Profile updated successfully');
