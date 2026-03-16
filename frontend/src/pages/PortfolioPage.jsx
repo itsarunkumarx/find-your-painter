@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaPlus, FaTrash, FaStar, FaTimes, FaUpload, FaImages, FaPaintBrush } from 'react-icons/fa';
 
+import { useTranslation } from 'react-i18next';
+
 const PortfolioPage = () => {
+    const { t } = useTranslation();
+    if (!t) return null;
     const [images, setImages] = useState([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
@@ -12,13 +16,12 @@ const PortfolioPage = () => {
     const [lightbox, setLightbox] = useState(null);
     const fileRef = useRef();
 
-    const token = localStorage.getItem('token');
-    const config = { headers: { Authorization: `Bearer ${token}` } };
+
 
     useEffect(() => {
         const fetchPortfolio = async () => {
             try {
-                const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/workers/profile`, config);
+                const { data } = await api.get('/workers/profile');
                 setImages(data.portfolioImages || []);
             } catch (e) { console.error(e); } finally { setLoading(false); }
         };
@@ -37,10 +40,9 @@ const PortfolioPage = () => {
         if (!preview) return;
         setUploading(true);
         try {
-            const { data } = await axios.post(
-                `${import.meta.env.VITE_API_URL}/api/workers/portfolio`,
-                { url: preview, caption },
-                config
+            const { data } = await api.post(
+                '/workers/portfolio',
+                { url: preview, caption }
             );
             setImages(data);
             setPreview(null);
@@ -52,17 +54,16 @@ const PortfolioPage = () => {
     const deleteImage = async (imgId) => {
         if (!window.confirm('Delete this portfolio item?')) return;
         try {
-            const { data } = await axios.delete(
-                `${import.meta.env.VITE_API_URL}/api/workers/portfolio/${imgId}`, config
-            );
+            const { data } = await api.delete(
+                `/workers/portfolio/${imgId}`);
             setImages(data);
         } catch (e) { console.error(e); }
     };
 
     const toggleFeatured = async (imgId) => {
         try {
-            const { data } = await axios.put(
-                `${import.meta.env.VITE_API_URL}/api/workers/portfolio/${imgId}/featured`, {}, config
+            const { data } = await api.put(
+                `/workers/portfolio/${imgId}/featured`, {}
             );
             setImages(data);
         } catch (e) { console.error(e); }
