@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/api';
 import { motion } from 'framer-motion';
 import { FaMapMarkerAlt, FaStar, FaShieldAlt, FaArrowLeft, FaComments, FaCalendarCheck } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
@@ -18,17 +18,14 @@ const PainterProfile = () => {
     useEffect(() => {
         const fetchProfileData = async () => {
             try {
-                const token = localStorage.getItem('token');
-                const config = { headers: { Authorization: `Bearer ${token}` } };
-
-                const { data: workerData } = await axios.get(`${import.meta.env.VITE_API_URL}/api/workers/${id}`, config);
+                const { data: workerData } = await api.get(`/workers/${id}`);
                 setWorker(workerData);
 
-                const { data: reviewData } = await axios.get(`${import.meta.env.VITE_API_URL}/api/reviews/worker/${id}`, config);
+                const { data: reviewData } = await api.get(`/reviews/worker/${id}`);
                 setReviews(reviewData);
 
                 // Add to recently viewed
-                await axios.put(`${import.meta.env.VITE_API_URL}/api/users/recently-viewed/${id}`, {}, config);
+                await api.put(`/users/recently-viewed/${id}`, {});
             } catch (error) {
                 console.error("Profile fetch error", error);
             } finally {
@@ -73,12 +70,12 @@ const PainterProfile = () => {
                             className="relative"
                         >
                             <div className="absolute -inset-4 bg-gradient-to-b from-royal-gold/20 to-[var(--text-main)]/10 rounded-3xl blur-xl opacity-50"></div>
-                            <div className="glass-card p-10 relative overflow-hidden">
+                            <div className="glass-card p-6 sm:p-10 relative overflow-hidden">
                                 <div className="flex flex-col items-center text-center">
                                     <div className="relative mb-8">
                                         <div className="absolute -inset-1 bg-royal-gold rounded-full blur-[2px] opacity-40"></div>
                                         <img
-                                            src={worker.user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${worker.user?.name}`}
+                                            src={worker.user?.profileImage || "/assets/premium-avatar.png"}
                                             alt={worker.user?.name}
                                             className="relative w-40 h-40 rounded-full border-4 border-royal-gold/30 object-cover shadow-2xl"
                                             loading="lazy"
@@ -90,7 +87,7 @@ const PainterProfile = () => {
                                         )}
                                     </div>
 
-                                    <h1 className="text-4xl font-bold text-[var(--text-main)] tracking-tight mb-2 uppercase">{worker.user?.name}</h1>
+                                    <h1 className="text-3xl sm:text-4xl font-bold text-[var(--text-main)] tracking-tight mb-2 uppercase">{worker.user?.name}</h1>
                                     <div className="flex items-center gap-3 text-royal-gold font-bold mb-6">
                                         <div className="flex items-center gap-1">
                                             <FaStar />
@@ -246,7 +243,7 @@ const PainterProfile = () => {
                                                 <div className="flex items-center gap-4">
                                                     <div className="relative">
                                                         <div className="absolute -inset-1 bg-royal-gold/20 rounded-full blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                                        <img src={review.user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${review.user?.name}`} className="relative w-12 h-12 rounded-full border-2 border-[var(--bg-base)] shadow-sm" alt={review.user?.name} loading="lazy" />
+                                                        <img src={review.user?.profileImage || "/assets/premium-avatar.png"} className="relative w-12 h-12 rounded-full border-2 border-[var(--bg-base)] shadow-sm" alt={review.user?.name} loading="lazy" />
                                                     </div>
                                                     <div>
                                                         <div className="text-xs font-black text-[var(--text-main)] uppercase tracking-wide group-hover:text-royal-gold transition-colors">{review.user?.name}</div>
