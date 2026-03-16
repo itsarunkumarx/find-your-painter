@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import CallOverlay from '../components/CallOverlay';
 import IncomingCallModal from '../components/IncomingCallModal';
 import { AnimatePresence } from 'framer-motion';
+import { RINGTONE_SUITES } from '../constants/ringtones';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -16,30 +17,6 @@ export const useSocket = () => {
         return {};
     }
     return context;
-};
-
-// ── Ringtone suites ──────────────────────────────────────────────────────────
-export const RINGTONE_SUITES = {
-    standard: {
-        incoming: '/sounds/ring-classic.mp3',
-        outgoing: '/sounds/ring-outgoing.mp3',
-        label: 'Classic Phone'
-    },
-    melodic: {
-        incoming: '/sounds/ring-melodic.mp3',
-        outgoing: '/sounds/ring-outgoing.mp3',
-        label: 'Soft Harmony'
-    },
-    urgent: {
-        incoming: '/sounds/ring-urgent.mp3',
-        outgoing: '/sounds/ring-outgoing.mp3',
-        label: 'High Priority'
-    },
-    minimal: {
-        incoming: '/sounds/ring-minimal.mp3',
-        outgoing: '/sounds/ring-outgoing.mp3',
-        label: 'Digital Pulse'
-    }
 };
 
 // ── Ringtone helpers ────────────────────────────────────────────────────────

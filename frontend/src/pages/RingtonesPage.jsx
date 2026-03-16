@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSocket, RINGTONE_SUITES } from '../context/SocketContext';
+import { useSocket } from '../context/SocketContext';
+import { RINGTONE_SUITES } from '../constants/ringtones';
 import { useTranslation } from 'react-i18next';
 import {
     FaMusic, FaPlay, FaStop, FaCheckCircle, FaVolumeUp,

@@ -24,7 +24,6 @@ export default defineConfig({
         display: 'standalone',
         appleMobileWebAppCapable: 'no', // Disable deprecated tag injection
         background_color: '#ffffff',
-        display: 'standalone',
         start_url: '/',
         id: '/',
         icons: [
