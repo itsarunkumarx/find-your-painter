@@ -42,23 +42,34 @@ registerRoute(
 
 // Handle Push Notifications
 self.addEventListener('push', (event) => {
-    const data = event.data ? event.data.json() : {};
-    const title = data.title || 'New Call';
+    let data = {};
+    try {
+        data = event.data ? event.data.json() : {};
+    } catch (e) {
+        data = { title: 'New Notification', body: event.data ? event.data.text() : 'You have a new alert' };
+    }
+
+    const title = data.title || 'FYP Notification';
     const options = {
-        body: data.body || 'Someone is calling you...',
+        body: data.body || 'New activity in Find Your Painter',
         icon: '/icons/icon-192.png',
         badge: '/icons/icon-192.png',
         data: {
-            url: data.url || '/'
+            url: data.url || '/',
+            type: data.type || 'generic'
         },
-        actions: [
-            { action: 'accept', title: 'Accept' },
-            { action: 'decline', title: 'Decline' }
-        ],
         vibrate: [200, 100, 200, 100, 200, 100, 200],
-        tag: 'call-notification',
-        renotify: true
+        tag: data.tag || 'fyp-notification',
+        renotify: true,
+        requireInteraction: data.type === 'call' // Keep calls active
     };
+
+    if (data.type === 'call') {
+        options.actions = [
+            { action: 'accept', title: 'Accept Call' },
+            { action: 'decline', title: 'Decline' }
+        ];
+    }
 
     event.waitUntil(
         self.registration.showNotification(title, options)
@@ -69,16 +80,23 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
 
-    if (event.action === 'accept') {
-        event.waitUntil(
-            clients.openWindow(event.notification.data.url + '?action=accept')
-        );
-    } else {
-        // Decline action or just clicking the notification
-        event.waitUntil(
-            clients.openWindow(event.notification.data.url)
-        );
-    }
+    const urlToOpen = new URL(event.notification.data.url, self.location.origin).href;
+
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+            // Check if there is already a window open
+            for (let i = 0; i < windowClients.length; i++) {
+                const client = windowClients[i];
+                if (client.url === urlToOpen && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            // If no window is open, open a new one
+            if (clients.openWindow) {
+                return clients.openWindow(urlToOpen + (event.action === 'accept' ? '?action=accept' : ''));
+            }
+        })
+    );
 });
 
 // Cache API calls or other dynamic content if needed
