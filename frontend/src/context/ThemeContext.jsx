@@ -24,7 +24,8 @@ export const ThemeProvider = ({ children }) => {
 export const useTheme = () => {
     const context = useContext(ThemeContext);
     if (!context) {
-        throw new Error('useTheme must be used within a ThemeProvider');
+        console.warn('useTheme: ThemeContext not available. Make sure component is wrapped in ThemeProvider.');
+        return { theme: 'light', toggleTheme: () => {}, setTheme: () => {} };
     }
     return context;
 };
