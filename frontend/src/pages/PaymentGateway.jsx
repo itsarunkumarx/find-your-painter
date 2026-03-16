@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaShieldAlt, FaLock, FaCheckCircle, FaRupeeSign, FaCreditCard, FaArrowLeft } from 'react-icons/fa';
 
@@ -12,16 +12,17 @@ const PaymentGateway = () => {
     const [processing, setProcessing] = useState(false);
     const [success, setSuccess] = useState(false);
 
-    const token = localStorage.getItem('token');
-    const config = { headers: { Authorization: `Bearer ${token}` } };
-
     useEffect(() => {
         const fetchBooking = async () => {
             try {
-                const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/bookings/my-bookings`, config);
+                const { data } = await api.get('/bookings/my-bookings');
                 const found = data.find(b => b._id === bookingId);
                 setBooking(found);
-            } catch (e) { console.error(e); } finally { setLoading(false); }
+            } catch (e) { 
+                console.error(e); 
+            } finally { 
+                setLoading(false); 
+            }
         };
         fetchBooking();
     }, [bookingId]);
@@ -31,10 +32,10 @@ const PaymentGateway = () => {
         // Simulate network delay
         setTimeout(async () => {
             try {
-                await axios.post(`${import.meta.env.VITE_API_URL}/api/payments/verify`, {
+                await api.post('/payments/verify', {
                     bookingId,
                     paymentId: 'PAY-' + Math.random().toString(36).substr(2, 9).toUpperCase()
-                }, config);
+                });
                 setSuccess(true);
                 setTimeout(() => navigate('/my-bookings'), 3000);
             } catch (e) {
@@ -42,6 +43,18 @@ const PaymentGateway = () => {
                 setProcessing(false);
             }
         }, 2000);
+    };
+
+    const handleCashPayment = async () => {
+        setProcessing(true);
+        try {
+            await api.post('/payments/select-post-paid', { bookingId });
+            setSuccess(true);
+            setTimeout(() => navigate('/my-bookings'), 3000);
+        } catch (e) {
+            console.error(e);
+            setProcessing(false);
+        }
     };
 
     if (loading) return <div className="min-h-screen flex items-center justify-center text-royal-gold animate-pulse font-black">SECURE CONNECTION...</div>;
@@ -123,17 +136,7 @@ const PaymentGateway = () => {
                         </button>
 
                         <button
-                            onClick={async () => {
-                                setProcessing(true);
-                                try {
-                                    await axios.post(`${import.meta.env.VITE_API_URL}/api/payments/select-post-paid`, { bookingId }, config);
-                                    setSuccess(true);
-                                    setTimeout(() => navigate('/my-bookings'), 3000);
-                                } catch (e) {
-                                    console.error(e);
-                                    setProcessing(false);
-                                }
-                            }}
+                            onClick={handleCashPayment}
                             disabled={processing}
                             className="w-full py-5 bg-white border-2 border-navy-deep text-navy-deep rounded-2xl font-black uppercase text-xs tracking-[0.3em] hover:bg-slate-50 transition-all disabled:opacity-50"
                         >
