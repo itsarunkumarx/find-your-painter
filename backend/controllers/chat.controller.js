@@ -1,6 +1,7 @@
 import { Chat } from '../models/Chat.js';
 import { Booking } from '../models/Booking.js';
 import { Worker } from '../models/Worker.js';
+import { sendMessageNotification } from './notification.controller.js';
 
 export const getChatHistory = async (req, res) => {
     try {
@@ -20,8 +21,6 @@ export const getChatHistory = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
-
-import { sendMessageNotification } from './notification.controller.js';
 
 export const sendMessage = async (req, res) => {
     const { bookingId, message, messageType = 'text', replyTo } = req.body;
@@ -116,25 +115,49 @@ export const getConversations = async (req, res) => {
             .populate('user', 'name profileImage')
             .populate({ path: 'worker', populate: { path: 'user', select: 'name profileImage' } });
 
-        const conversations = await Promise.all(bookings.map(async (booking) => {
-            const lastMessage = await Chat.findOne({ booking: booking._id, isDeleted: false })
-                .sort({ createdAt: -1 })
-                .populate('sender', 'name');
+        // Group by participant to avoid duplicates
+        const groupedMap = new Map();
 
-            const unreadCount = await Chat.countDocuments({
-                booking: booking._id,
-                sender: { $ne: req.user._id },
-                readBy: { $ne: req.user._id }
-            });
+        await Promise.all(bookings.map(async (booking) => {
+            const otherUser = req.user.role === 'worker' 
+                ? booking.user 
+                : (booking.worker?.user || booking.worker);
+            
+            if (!otherUser) return;
+            
+            const otherUserId = (typeof otherUser === 'object' ? (otherUser._id || otherUser.id) : otherUser)?.toString();
+            if (!otherUserId) return;
 
-            return { booking, lastMessage, unreadCount };
+            const [lastMessage, unreadCount] = await Promise.all([
+                Chat.findOne({ booking: booking._id, isDeleted: false })
+                    .sort({ createdAt: -1 })
+                    .populate('sender', 'name'),
+                Chat.countDocuments({
+                    booking: booking._id,
+                    sender: { $ne: req.user._id },
+                    readBy: { $ne: req.user._id },
+                    isDeleted: false
+                })
+            ]);
+
+            const activityDate = lastMessage?.createdAt || booking.createdAt;
+
+            if (!groupedMap.has(otherUserId) || new Date(activityDate) > new Date(groupedMap.get(otherUserId).latestActivity)) {
+                groupedMap.set(otherUserId, {
+                    booking,
+                    otherUser,
+                    lastMessage,
+                    unreadCount: (groupedMap.get(otherUserId)?.unreadCount || 0) + unreadCount,
+                    latestActivity: activityDate
+                });
+            } else {
+                const existing = groupedMap.get(otherUserId);
+                existing.unreadCount += unreadCount;
+            }
         }));
 
-        conversations.sort((a, b) => {
-            const dateA = a.lastMessage?.createdAt || a.booking.createdAt;
-            const dateB = b.lastMessage?.createdAt || b.booking.createdAt;
-            return new Date(dateB) - new Date(dateA);
-        });
+        const conversations = Array.from(groupedMap.values())
+            .sort((a, b) => new Date(b.latestActivity) - new Date(a.latestActivity));
 
         res.json(conversations);
     } catch (error) {
@@ -151,16 +174,82 @@ export const getUnreadCount = async (req, res) => {
             ? {}
             : { $or: [{ user: req.user._id }, { worker: workerId }] };
 
-        const bookings = await Booking.find(query).select('_id');
-        const bookingIds = bookings.map(b => b._id);
+        const bookings = await Booking.find(query);
+        
+        let total = 0;
+        await Promise.all(bookings.map(async (booking) => {
+            const otherUser = req.user.role === 'worker' 
+                ? booking.user 
+                : (booking.worker?.user || booking.worker);
+            
+            if (!otherUser) return;
 
-        const total = await Chat.countDocuments({
-            booking: { $in: bookingIds },
-            sender: { $ne: req.user._id },
-            readBy: { $ne: req.user._id }
-        });
+            // Same logic as getConversations: only count if participant or explicitly an admin monitoring
+            const isParticipant = booking.user?._id?.toString() === req.user._id.toString() || 
+                                (booking.worker?.user?._id || booking.worker?.user || booking.worker)?.toString() === req.user._id.toString();
+
+            if (!isParticipant && req.user.role !== 'admin') return;
+
+            const count = await Chat.countDocuments({
+                booking: booking._id,
+                sender: { $ne: req.user._id },
+                readBy: { $ne: req.user._id },
+                isDeleted: false
+            });
+            total += count;
+        }));
 
         res.json({ total });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const toggleReaction = async (req, res) => {
+    try {
+        const { messageId } = req.params;
+        const { emoji } = req.body;
+        const chat = await Chat.findById(messageId);
+        if (!chat) return res.status(404).json({ message: 'Message not found' });
+
+        const existingIndex = chat.reactions.findIndex(r => r.userId.toString() === req.user._id.toString() && r.emoji === emoji);
+        if (existingIndex > -1) {
+            chat.reactions.splice(existingIndex, 1);
+        } else {
+            chat.reactions.push({ userId: req.user._id, emoji });
+        }
+        await chat.save();
+        res.json(chat.reactions);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+export const initiateConversation = async (req, res) => {
+    try {
+        const { workerId } = req.params;
+        const userId = req.user._id;
+
+        // Search for existing booking (active or pending)
+        let booking = await Booking.findOne({
+            user: userId,
+            worker: workerId,
+            status: { $in: ['pending', 'accepted'] }
+        });
+
+        if (!booking) {
+            // Create a minimal "Inquiry" booking
+            booking = await Booking.create({
+                user: userId,
+                worker: workerId,
+                status: 'pending',
+                serviceType: 'Interior', // Default for inquiry
+                location: 'Initial Inquiry',
+                date: new Date(),
+                message: 'Auto-initiated chat from explore page.'
+            });
+        }
+
+        res.json({ bookingId: booking._id });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
