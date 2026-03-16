@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import axios from 'axios';
+import api from '../utils/api';
 import { FaCheckCircle, FaComments, FaPhone, FaVideo, FaTimes, FaUserAlt, FaMapMarkerAlt, FaPaintRoller, FaCalendarAlt } from 'react-icons/fa';
 import Chat from './Chat';
-import CallModal from './CallModal';
+import { useSocket } from '../context/SocketContext';
 
 const BookingModal = ({ isOpen, onClose, worker }) => {
     const { t } = useTranslation();
@@ -20,28 +20,25 @@ const BookingModal = ({ isOpen, onClose, worker }) => {
     const [isSuccess, setIsSuccess] = useState(false);
     const [createdBooking, setCreatedBooking] = useState(null);
     const [showChat, setShowChat] = useState(false);
-    const [callConfig, setCallConfig] = useState({ isOpen: false, type: 'voice' });
+    const { startCall } = useSocket();
 
     const handleBook = async (e) => {
         e.preventDefault();
         setLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-
-            const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/api/bookings`, {
+            const { data } = await api.post('/bookings', {
                 workerId: worker._id,
                 date: formData.date,
                 message: formData.message,
                 serviceType: formData.serviceType,
                 location: formData.location
-            }, config);
+            });
 
             setCreatedBooking(data);
             setIsSuccess(true);
         } catch (error) {
             console.error("Booking error:", error.response?.data || error.message);
-            alert(t('booking_failed') || 'Booking failed. Please ensure all fields are filled.');
+            alert(t('booking_failed'));
         } finally {
             setLoading(false);
         }
@@ -49,7 +46,7 @@ const BookingModal = ({ isOpen, onClose, worker }) => {
 
     const handleGetLocation = () => {
         if (!navigator.geolocation) {
-            alert("Geolocation is not supported by your browser");
+            alert(t('geolocation_unsupported'));
             return;
         }
 
@@ -67,7 +64,7 @@ const BookingModal = ({ isOpen, onClose, worker }) => {
                 }
             },
             (error) => {
-                alert("Unable to retrieve your location");
+                alert(t('location_error'));
             }
         );
     };
@@ -116,7 +113,7 @@ const BookingModal = ({ isOpen, onClose, worker }) => {
                                     </h2>
                                     <div className="flex items-center gap-3 mt-4 p-3 bg-ivory-subtle rounded-2xl border border-royal-gold/10">
                                         <div className="w-10 h-10 rounded-xl overflow-hidden border border-royal-gold/20">
-                                            <img src={worker?.user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${worker?.user?.name}`} alt="Pro" className="w-full h-full object-cover" />
+                                            <img src={worker?.user?.profileImage || "/assets/premium-avatar.png"} alt="Pro" className="w-full h-full object-cover" />
                                         </div>
                                         <div>
                                             <p className="text-[8px] font-black text-slate-400 tracking-widest uppercase mb-0.5">{t('target_agent')}</p>
@@ -141,7 +138,7 @@ const BookingModal = ({ isOpen, onClose, worker }) => {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1 flex items-center gap-2">
-                                                <FaPaintRoller className="text-royal-gold" /> Service Type
+                                                <FaPaintRoller className="text-royal-gold" /> {t('service_type')}
                                             </label>
                                             <select
                                                 value={formData.serviceType}
@@ -149,21 +146,21 @@ const BookingModal = ({ isOpen, onClose, worker }) => {
                                                 className="w-full bg-ivory-subtle border border-royal-gold/10 rounded-2xl py-4 px-6 text-xs font-bold text-navy-deep tracking-wider focus:outline-none focus:border-royal-gold transition-all appearance-none cursor-pointer"
                                                 required
                                             >
-                                                <option value="Interior">Interior Painting</option>
-                                                <option value="Exterior">Exterior Painting</option>
-                                                <option value="Commercial">Commercial Project</option>
+                                                <option value="Interior">{t('Interior Painting')}</option>
+                                                <option value="Exterior">{t('Exterior Painting')}</option>
+                                                <option value="Commercial">{t('Commercial Project')}</option>
                                             </select>
                                         </div>
                                     </div>
 
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1 flex items-center gap-2">
-                                            <FaMapMarkerAlt className="text-royal-gold" /> Project Location
+                                            <FaMapMarkerAlt className="text-royal-gold" /> {t('location_label')}
                                         </label>
                                         <div className="relative group/loc">
                                             <input
                                                 type="text"
-                                                placeholder="e.g. Bandra West, Mumbai"
+                                                placeholder={t('location_placeholder_example')}
                                                 value={formData.location}
                                                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                                                 className="w-full bg-ivory-subtle border border-royal-gold/10 rounded-2xl py-4 px-6 pr-14 text-xs font-bold text-navy-deep tracking-wider focus:outline-none focus:border-royal-gold transition-all placeholder-navy-deep/20"
@@ -173,7 +170,7 @@ const BookingModal = ({ isOpen, onClose, worker }) => {
                                                 type="button"
                                                 onClick={handleGetLocation}
                                                 className="absolute right-4 top-1/2 -translate-y-1/2 text-royal-gold hover:text-navy-deep transition-colors p-2"
-                                                title="Use current location"
+                                                title={t('use_current_location')}
                                             >
                                                 <FaMapMarkerAlt />
                                             </button>
@@ -213,16 +210,16 @@ const BookingModal = ({ isOpen, onClose, worker }) => {
                                 <div className="mb-8">
                                     <div className="text-[10px] font-black text-green-600 uppercase tracking-[0.4em] mb-2">{t('booking_sucess')}</div>
                                     <h2 className="text-4xl font-black text-navy-deep tracking-tighter leading-none mb-4 italic uppercase">
-                                        Link <span className="text-royal-gold">Established</span>
+                                        {t('link_established_prefix')} <span className="text-royal-gold">{t('link_established_suffix')}</span>
                                     </h2>
                                     <p className="text-xs font-bold text-slate-400 tracking-widest uppercase max-w-xs mx-auto leading-relaxed">
-                                        Expert {worker?.user?.name} has been notified and is reviewing the deployment.
+                                        {t('expert_notified_desc', { name: worker?.user?.name })}
                                     </p>
                                 </div>
 
                                 {/* Instant Connect Cluster */}
                                 <div className="w-full bg-ivory-subtle border border-royal-gold/10 rounded-[2.5rem] p-8 space-y-6 mb-10">
-                                    <div className="text-[10px] font-black text-navy-deep/40 uppercase tracking-[0.3em]">Direct Communication Portal</div>
+                                    <div className="text-[10px] font-black text-navy-deep/40 uppercase tracking-[0.3em]">{t('direct_comm_portal')}</div>
 
                                     <div className="flex items-center justify-center gap-4">
                                         <button
@@ -232,27 +229,27 @@ const BookingModal = ({ isOpen, onClose, worker }) => {
                                             <div className="w-14 h-14 bg-navy-deep text-royal-gold rounded-2xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
                                                 <FaComments />
                                             </div>
-                                            <span className="text-[8px] font-black uppercase tracking-widest text-navy-deep">Message</span>
+                                            <span className="text-[8px] font-black uppercase tracking-widest text-navy-deep">{t('nav_messages')}</span>
                                         </button>
 
                                         <button
-                                            onClick={() => setCallConfig({ isOpen: true, type: 'voice' })}
+                                            onClick={() => startCall(worker.user, 'voice')}
                                             className="group flex flex-col items-center gap-3 p-6 bg-white rounded-3xl border border-royal-gold/10 hover:border-royal-gold transition-all shadow-sm hover:shadow-xl hover:-translate-y-1"
                                         >
                                             <div className="w-14 h-14 bg-navy-deep text-royal-gold rounded-2xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
                                                 <FaPhone />
                                             </div>
-                                            <span className="text-[8px] font-black uppercase tracking-widest text-navy-deep">Voice Call</span>
+                                            <span className="text-[8px] font-black uppercase tracking-widest text-navy-deep">{t('voice_call')}</span>
                                         </button>
 
                                         <button
-                                            onClick={() => setCallConfig({ isOpen: true, type: 'video' })}
+                                            onClick={() => startCall(worker.user, 'video')}
                                             className="group flex flex-col items-center gap-3 p-6 bg-white rounded-3xl border border-royal-gold/10 hover:border-royal-gold transition-all shadow-sm hover:shadow-xl hover:-translate-y-1"
                                         >
                                             <div className="w-14 h-14 bg-navy-deep text-royal-gold rounded-2xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
                                                 <FaVideo />
                                             </div>
-                                            <span className="text-[8px] font-black uppercase tracking-widest text-navy-deep">Video Link</span>
+                                            <span className="text-[8px] font-black uppercase tracking-widest text-navy-deep">{t('video_link')}</span>
                                         </button>
                                     </div>
                                 </div>
@@ -262,13 +259,13 @@ const BookingModal = ({ isOpen, onClose, worker }) => {
                                         onClick={() => navigate(`/payment/${createdBooking._id}`)}
                                         className="w-full py-5 bg-royal-gold text-navy-deep text-[10px] font-black uppercase tracking-[0.3em] rounded-2xl shadow-xl shadow-royal-gold/20 hover:scale-[1.02] transition-all"
                                     >
-                                        Proceed to Payment
+                                        {t('proceed_to_payment')}
                                     </button>
                                     <button
                                         onClick={handleClose}
                                         className="w-full text-[10px] font-black text-navy-deep/40 hover:text-navy-deep uppercase tracking-[0.4em] transition-colors"
                                     >
-                                        Return to Overview
+                                        {t('return_to_overview')}
                                     </button>
                                 </div>
                             </div>
@@ -286,12 +283,6 @@ const BookingModal = ({ isOpen, onClose, worker }) => {
                                     />
                                 )}
                             </AnimatePresence>
-                            <CallModal
-                                isOpen={callConfig.isOpen}
-                                onClose={() => setCallConfig({ ...callConfig, isOpen: false })}
-                                type={callConfig.type}
-                                contact={worker.user}
-                            />
                         </>
                     )}
                 </motion.div>
