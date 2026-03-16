@@ -3,27 +3,29 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import {
-    FaUser, FaLock, FaGlobe, FaShieldAlt, FaBell,
-    FaCheckCircle, FaChevronRight, FaCamera, FaPhone, FaMapMarkerAlt, FaEnvelope,
-    FaSignOutAlt
+    FaUser, FaBell, FaPalette, FaHistory, FaSignOutAlt, FaShieldAlt, FaLanguage, FaVolumeUp, FaVideo, FaGamepad, FaLink, FaMobileAlt,
+    FaGlobe, FaChevronRight, FaCamera, FaCheckCircle, FaPhone, FaEnvelope, FaMapMarkerAlt, FaLock
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/api';
+import { useRef, useEffect } from 'react';
+import { useSocket } from '../context/SocketContext';
 
 const SettingsPage = () => {
-    const { user, login, logout } = useAuth();
+    const { user, updateUser, logout } = useAuth();
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(false);
+    const fileInputRef = useRef(null);
 
     // Profile State
     const [profileData, setProfileData] = useState({
-        name: user?.name || '',
-        email: user?.email || '',
-        phoneNumber: user?.phoneNumber || '',
-        address: user?.address || '',
-        profileImage: user?.profileImage || ''
+        name: '',
+        email: '',
+        phoneNumber: '',
+        address: '',
+        profileImage: ''
     });
 
     // Security State
@@ -33,15 +35,25 @@ const SettingsPage = () => {
         confirmPassword: ''
     });
 
+    // Update local state when user context changes
+    useEffect(() => {
+        if (user) {
+            setProfileData({
+                name: user.name || '',
+                email: user.email || '',
+                phoneNumber: user.phoneNumber || '',
+                address: user.address || '',
+                profileImage: user.profileImage || ''
+            });
+        }
+    }, [user]);
+
     const handleProfileUpdate = async (e) => {
         e.preventDefault();
         setLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            const { data } = await axios.put(`${import.meta.env.VITE_API_URL}/api/users/profile`, profileData, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            login(data);
+            const { data } = await api.put('/users/profile', profileData);
+            updateUser(data);
             alert('Profile updated successfully');
         } catch (error) {
             alert(error.response?.data?.message || 'Update failed');
@@ -58,11 +70,8 @@ const SettingsPage = () => {
         }
         setLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            await axios.put(`${import.meta.env.VITE_API_URL}/api/users/profile`, {
+            await api.put('/users/profile', {
                 password: securityData.newPassword
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
             alert('Password updated successfully');
             setSecurityData({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -73,9 +82,22 @@ const SettingsPage = () => {
         }
     };
 
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setProfileData(prev => ({ ...prev, profileImage: reader.result }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const changeLanguage = (lng) => {
         i18n.changeLanguage(lng);
     };
+
+    const { isPushSupported, isSubscribed, subscribeToPush } = useSocket();
 
     const handleLogout = () => {
         logout();
@@ -146,11 +168,22 @@ const SettingsPage = () => {
                                         <div className="relative group">
                                             <div className="absolute -inset-2 bg-royal-gold/10 rounded-[2.5rem] blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
                                             <img
-                                                src={profileData.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profileData.name}`}
+                                                src={profileData.profileImage || "/assets/premium-avatar.png"}
                                                 className="w-32 h-32 rounded-[2.5rem] object-cover border-4 border-[var(--bg-base)] shadow-xl relative"
                                                 alt="Avatar"
                                             />
-                                            <button type="button" className="absolute -bottom-2 -right-2 bg-[var(--text-main)] text-royal-gold p-3 rounded-2xl shadow-xl hover:scale-110 transition-transform">
+                                            <input
+                                                type="file"
+                                                ref={fileInputRef}
+                                                onChange={handleImageChange}
+                                                className="hidden"
+                                                accept="image/*"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => fileInputRef.current.click()}
+                                                className="absolute -bottom-2 -right-2 bg-[var(--text-main)] text-royal-gold p-3 rounded-2xl shadow-xl hover:scale-110 transition-transform"
+                                            >
                                                 <FaCamera size={14} />
                                             </button>
                                         </div>
@@ -179,38 +212,38 @@ const SettingsPage = () => {
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-2">Phone Deployment</label>
+                                            <label className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] ml-2">Phone Deployment</label>
                                             <div className="relative">
                                                 <FaPhone className="absolute left-5 top-1/2 -translate-y-1/2 text-royal-gold/40" />
                                                 <input
                                                     type="text"
                                                     value={profileData.phoneNumber}
                                                     onChange={(e) => setProfileData({ ...profileData, phoneNumber: e.target.value })}
-                                                    className="w-full bg-ivory-subtle border-none rounded-2xl py-4 pl-12 pr-6 text-navy-deep text-xs font-bold outline-none ring-1 ring-royal-gold/5 focus:ring-royal-gold/30 transition-all"
+                                                    className="w-full bg-[var(--bg-highlight)] border-none rounded-2xl py-4 pl-12 pr-6 text-[var(--text-main)] text-xs font-bold outline-none ring-1 ring-royal-gold/5 focus:ring-royal-gold/30 transition-all"
                                                 />
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-2">Email Relay</label>
+                                            <label className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] ml-2">Email Relay</label>
                                             <div className="relative">
                                                 <FaEnvelope className="absolute left-5 top-1/2 -translate-y-1/2 text-royal-gold/40" />
                                                 <input
                                                     type="email"
                                                     value={profileData.email}
                                                     onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                                                    className="w-full bg-ivory-subtle border-none rounded-2xl py-4 pl-12 pr-6 text-navy-deep text-xs font-bold outline-none ring-1 ring-royal-gold/5 focus:ring-royal-gold/30 transition-all"
+                                                    className="w-full bg-[var(--bg-highlight)] border-none rounded-2xl py-4 pl-12 pr-6 text-[var(--text-main)] text-xs font-bold outline-none ring-1 ring-royal-gold/5 focus:ring-royal-gold/30 transition-all"
                                                 />
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-2">Service Sector</label>
+                                            <label className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] ml-2">Service Sector</label>
                                             <div className="relative">
                                                 <FaMapMarkerAlt className="absolute left-5 top-1/2 -translate-y-1/2 text-royal-gold/40" />
                                                 <input
                                                     type="text"
                                                     value={profileData.address}
                                                     onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
-                                                    className="w-full bg-ivory-subtle border-none rounded-2xl py-4 pl-12 pr-6 text-navy-deep text-xs font-bold outline-none ring-1 ring-royal-gold/5 focus:ring-royal-gold/30 transition-all"
+                                                    className="w-full bg-[var(--bg-highlight)] border-none rounded-2xl py-4 pl-12 pr-6 text-[var(--text-main)] text-xs font-bold outline-none ring-1 ring-royal-gold/5 focus:ring-royal-gold/30 transition-all"
                                                 />
                                             </div>
                                         </div>
@@ -222,7 +255,7 @@ const SettingsPage = () => {
                                             disabled={loading}
                                             className="px-10 py-5 bg-[var(--text-main)] text-royal-gold rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl shadow-royal-gold/20 hover:scale-105 transition-all active:scale-95 disabled:opacity-50"
                                         >
-                                            {loading ? 'Synchronizing...' : 'Sychronize Identity'}
+                                            {loading ? 'Synchronizing...' : 'Synchronize Identity'}
                                         </button>
                                     </div>
                                 </form>
@@ -242,30 +275,30 @@ const SettingsPage = () => {
 
                                     <div className="space-y-6">
                                         <div className="space-y-2">
-                                            <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-2">Current Cipher</label>
+                                            <label className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] ml-2">Current Cipher</label>
                                             <input
                                                 type="password"
                                                 value={securityData.currentPassword}
                                                 onChange={(e) => setSecurityData({ ...securityData, currentPassword: e.target.value })}
-                                                className="w-full bg-ivory-subtle border-none rounded-2xl py-4 px-6 text-navy-deep text-xs font-bold outline-none ring-1 ring-royal-gold/5 focus:ring-royal-gold/30 transition-all"
+                                                className="w-full bg-[var(--bg-highlight)] border-none rounded-2xl py-4 px-6 text-[var(--text-main)] text-xs font-bold outline-none ring-1 ring-royal-gold/5 focus:ring-royal-gold/30 transition-all"
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-2">New Cipher</label>
+                                            <label className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] ml-2">New Cipher</label>
                                             <input
                                                 type="password"
                                                 value={securityData.newPassword}
                                                 onChange={(e) => setSecurityData({ ...securityData, newPassword: e.target.value })}
-                                                className="w-full bg-ivory-subtle border-none rounded-2xl py-4 px-6 text-navy-deep text-xs font-bold outline-none ring-1 ring-royal-gold/5 focus:ring-royal-gold/30 transition-all"
+                                                className="w-full bg-[var(--bg-highlight)] border-none rounded-2xl py-4 px-6 text-[var(--text-main)] text-xs font-bold outline-none ring-1 ring-royal-gold/5 focus:ring-royal-gold/30 transition-all"
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-2">Verify Cipher</label>
+                                            <label className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] ml-2">Verify Cipher</label>
                                             <input
                                                 type="password"
                                                 value={securityData.confirmPassword}
                                                 onChange={(e) => setSecurityData({ ...securityData, confirmPassword: e.target.value })}
-                                                className="w-full bg-ivory-subtle border-none rounded-2xl py-4 px-6 text-navy-deep text-xs font-bold outline-none ring-1 ring-royal-gold/5 focus:ring-royal-gold/30 transition-all"
+                                                className="w-full bg-[var(--bg-highlight)] border-none rounded-2xl py-4 px-6 text-[var(--text-main)] text-xs font-bold outline-none ring-1 ring-royal-gold/5 focus:ring-royal-gold/30 transition-all"
                                             />
                                         </div>
                                     </div>
@@ -285,8 +318,7 @@ const SettingsPage = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         {[
                                             { id: 'en', label: 'English (US)', flag: '🇺🇸', desc: 'Global Standard Intelligence' },
-                                            { id: 'hi', label: 'हिन्दी (India)', flag: '🇮🇳', desc: 'Regional Bharat Interface' },
-                                            { id: 'mr', label: 'मराठी (MH)', flag: '🇮🇳', desc: 'State Specific Dialect' }
+                                            { id: 'ta', label: 'தமிழ் (Tamil)', flag: '🇮🇳', desc: 'Regional Bharat Interface' }
                                         ].map((lang) => (
                                             <button
                                                 key={lang.id}
@@ -318,12 +350,38 @@ const SettingsPage = () => {
                                         ].map((item) => (
                                             <div key={item.id} className="flex items-center justify-between p-6 bg-ivory-subtle rounded-3xl border border-royal-gold/5 group hover:border-royal-gold/20 transition-all">
                                                 <div>
-                                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-navy-deep">{item.label}</h4>
-                                                    <p className="text-[9px] font-bold text-slate-400 mt-1">{item.desc}</p>
+                                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-[var(--text-main)]">{item.label}</h4>
+                                                    <p className="text-[9px] font-bold text-[var(--text-muted)] mt-1">{item.desc}</p>
                                                 </div>
-                                                <div className="w-12 h-6 bg-slate-200 rounded-full relative cursor-not-allowed opacity-50">
-                                                    <div className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-md" />
-                                                </div>
+                                                {item.id === 'push' ? (
+                                                    <div className="flex items-center justify-between p-4 bg-navy-deep/5 rounded-2xl hover:bg-navy-deep/10 transition-all">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="p-3 bg-white/80 rounded-xl text-navy-deep/40 group-hover:text-royal-gold transition-colors">
+                                                                <FaMobileAlt size={20} />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm font-bold text-navy-deep">Offline Notifications</p>
+                                                                <p className="text-[10px] text-navy-deep/50">Get alerts even when app is closed</p>
+                                                            </div>
+                                                        </div>
+                                                        {isPushSupported ? (
+                                                            <button
+                                                                onClick={subscribeToPush}
+                                                                disabled={isSubscribed}
+                                                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isSubscribed ? 'bg-green-500/10 text-green-500 cursor-default' : 'bg-navy-deep text-royal-gold hover:scale-105'
+                                                                    }`}
+                                                            >
+                                                                {isSubscribed ? 'Enabled' : 'Enable'}
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-[9px] font-bold text-red-500 bg-red-50 px-3 py-1 rounded-full">Not Supported</span>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-12 h-6 bg-[var(--bg-base)] rounded-full relative cursor-not-allowed opacity-50">
+                                                        <div className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-md" />
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
