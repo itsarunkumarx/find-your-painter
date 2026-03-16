@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { motion } from 'framer-motion';
 import { FaBell, FaPaperPlane, FaUsers, FaUserTie, FaInfoCircle, FaCheckCircle } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 
 const AdminNotifications = () => {
+    const { t } = useTranslation();
+    if (!t) return null;
     const [title, setTitle] = useState('');
     const [message, setMessage] = useState('');
     const [targetRole, setTargetRole] = useState('all');
@@ -16,17 +19,14 @@ const AdminNotifications = () => {
         setLoading(true);
         setStatus(null);
         try {
-            const token = localStorage.getItem('token');
-            await axios.post(`${import.meta.env.VITE_API_URL}/api/admin/notify`, {
+            await api.post('/admin/notify', {
                 title, message, targetRole, icon
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
-            setStatus({ type: 'success', text: `Broadcast sent successfully to ${targetRole} users!` });
+            setStatus({ type: 'success', text: `${t('broadcast_success')} ${targetRole === 'all' ? t('audience_all') : targetRole} ${t('users_label') || 'users'}!` });
             setTitle('');
             setMessage('');
         } catch (error) {
-            setStatus({ type: 'error', text: error.response?.data?.message || 'Failed to send broadcast' });
+            setStatus({ type: 'error', text: error.response?.data?.message || t('broadcast_failed') });
         } finally {
             setLoading(false);
         }
@@ -37,8 +37,8 @@ const AdminNotifications = () => {
     return (
         <div className="max-w-4xl mx-auto space-y-10 pb-12">
             <div>
-                <h1 className="text-3xl font-black text-navy-deep tracking-tight uppercase">Broadcast <span className="text-royal-gold">Centre</span></h1>
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Send global alerts and updates to the platform</p>
+                <h1 className="text-3xl font-black text-navy-deep tracking-tight uppercase">{t('broadcast_centre').split(' ')[0]} <span className="text-royal-gold">{t('broadcast_centre').split(' ')[1]}</span></h1>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">{t('global_alerts_desc')}</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
@@ -48,11 +48,11 @@ const AdminNotifications = () => {
 
                         <div className="space-y-6">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-navy-deep/40 ml-1">Notification Title</label>
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-navy-deep/40 ml-1">{t('notif_title_label')}</label>
                                 <input
                                     required
                                     type="text"
-                                    placeholder="e.g., Platform Maintenance Update"
+                                    placeholder={t('notif_title_placeholder')}
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     className="w-full bg-ivory-subtle border border-royal-gold/10 rounded-2xl py-4 px-6 text-sm font-bold text-navy-deep focus:outline-none focus:border-royal-gold transition-all"
@@ -60,11 +60,11 @@ const AdminNotifications = () => {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-navy-deep/40 ml-1">Message Content</label>
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-navy-deep/40 ml-1">{t('msg_content_label')}</label>
                                 <textarea
                                     required
                                     rows="5"
-                                    placeholder="Enter the detailed message for users..."
+                                    placeholder={t('msg_content_placeholder')}
                                     value={message}
                                     onChange={(e) => setMessage(e.target.value)}
                                     className="w-full bg-ivory-subtle border border-royal-gold/10 rounded-2xl py-4 px-6 text-sm font-bold text-navy-deep focus:outline-none focus:border-royal-gold transition-all resize-none"
@@ -73,28 +73,28 @@ const AdminNotifications = () => {
 
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-navy-deep/40 ml-1">Target Audience</label>
-                                    <div className="flex p-1.5 bg-ivory-subtle border border-royal-gold/10 rounded-2xl">
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-navy-deep/40 ml-1">{t('target_audience')}</label>
+                                    <div className="flex flex-wrap gap-2 p-1.5 bg-ivory-subtle border border-royal-gold/10 rounded-2xl">
                                         {[
-                                            { id: 'all', icon: FaBell, label: 'All' },
-                                            { id: 'user', icon: FaUsers, label: 'Users' },
-                                            { id: 'worker', icon: FaUserTie, label: 'Workers' }
+                                            { id: 'all', icon: FaBell, label: t('audience_all') },
+                                            { id: 'user', icon: FaUsers, label: t('users_label') || 'Users' },
+                                            { id: 'worker', icon: FaUserTie, label: t('workers_label') || 'Workers' }
                                         ].map((role) => (
                                             <button
                                                 key={role.id}
                                                 type="button"
                                                 onClick={() => setTargetRole(role.id)}
-                                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${targetRole === role.id ? 'bg-navy-deep text-royal-gold shadow-lg' : 'text-slate-400 hover:text-navy-deep'
+                                                className={`flex-1 min-w-[80px] flex items-center justify-center gap-2 py-3 px-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${targetRole === role.id ? 'bg-navy-deep text-royal-gold shadow-lg' : 'text-slate-400 hover:text-navy-deep'
                                                     }`}
                                             >
-                                                <role.icon size={10} /> {role.label}
+                                                <role.icon size={10} className="shrink-0" /> <span className="truncate">{role.label}</span>
                                             </button>
                                         ))}
                                     </div>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-navy-deep/40 ml-1">Select Icon</label>
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-navy-deep/40 ml-1">{t('select_icon')}</label>
                                     <div className="flex flex-wrap gap-2 p-1.5 bg-ivory-subtle border border-royal-gold/10 rounded-2xl">
                                         {icons.map((i) => (
                                             <button
@@ -117,9 +117,9 @@ const AdminNotifications = () => {
                                 disabled={loading}
                                 className="w-full bg-navy-deep text-royal-gold py-5 rounded-2xl font-black uppercase text-xs tracking-[0.3em] flex items-center justify-center gap-4 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 shadow-2xl shadow-navy-deep/20"
                             >
-                                {loading ? 'Processing...' : (
+                                {loading ? t('processing_btn') || 'Processing...' : (
                                     <>
-                                        Dispatch Broadcast <FaPaperPlane />
+                                        {t('dispatch_broadcast_btn')} <FaPaperPlane />
                                     </>
                                 )}
                             </button>
@@ -142,13 +142,13 @@ const AdminNotifications = () => {
                 <div className="space-y-8">
                     <div className="bg-navy-deep rounded-[2.5rem] p-8 text-white relative shadow-2xl border border-royal-gold/10 overflow-hidden">
                         <FaInfoCircle className="absolute -top-4 -right-4 text-8xl text-royal-gold/5" />
-                        <h3 className="text-lg font-black tracking-tight mb-4 uppercase">Broadcast <br /> Guidelines</h3>
+                        <h3 className="text-lg font-black tracking-tight mb-4 uppercase">{t('broadcast_guidelines').split(' ')[0]} <br /> {t('broadcast_guidelines').split(' ')[1]}</h3>
                         <ul className="space-y-4">
                             {[
-                                'Use clear and concise titles',
-                                'Target relevant groups only',
-                                'Avoid excessive punctuation',
-                                'Always mention the impact'
+                                t('rule_concise'),
+                                t('rule_target'),
+                                t('rule_punc'),
+                                t('rule_impact')
                             ].map((rule, i) => (
                                 <li key={i} className="flex gap-3 text-[10px] font-bold text-slate-300">
                                     <span className="text-royal-gold">•</span> {rule}
@@ -159,16 +159,16 @@ const AdminNotifications = () => {
 
                     <div className="bg-white rounded-[2.5rem] p-8 border border-royal-gold/10 shadow-xl shadow-royal-gold/5">
                         <h3 className="text-xs font-black text-navy-deep tracking-tight uppercase mb-6 flex items-center gap-3">
-                            <div className="w-1.5 h-4 bg-royal-gold rounded-full" /> Live Preview
+                            <div className="w-1.5 h-4 bg-royal-gold rounded-full" /> {t('live_preview')}
                         </h3>
                         <div className="p-5 bg-ivory-subtle border border-royal-gold/10 rounded-2xl flex gap-4">
                             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-xl shadow-sm border border-royal-gold/5 shrink-0">
                                 {icon}
                             </div>
                             <div className="min-w-0">
-                                <h4 className="text-[10px] font-black text-navy-deep uppercase truncate">{title || 'Your Title Here'}</h4>
+                                <h4 className="text-[10px] font-black text-navy-deep uppercase truncate">{title || t('preview_title')}</h4>
                                 <p className="text-[9px] font-bold text-slate-400 leading-relaxed mt-1 line-clamp-2">
-                                    {message || 'The content of your broadcast message will appear here...'}
+                                    {message || t('preview_msg')}
                                 </p>
                             </div>
                         </div>
