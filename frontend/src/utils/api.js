@@ -1,12 +1,8 @@
 import axios from 'axios';
 
-const baseURL = import.meta.env.VITE_API_URL;
-
-// Ensure the baseURL doesn't end with /api if we are going to append it later,
-// or handle it consistently.
-// Most reliable: if baseURL contains /api, use it as is for base.
-// If not, append /api.
-const cleanBaseURL = baseURL.endsWith('/api') ? baseURL : `${baseURL}/api`;
+const rawBaseURL = import.meta.env.VITE_API_URL || '';
+// Normalize URL: remove trailing slashes and common mistake suffixes, then add exactly one /api
+const cleanBaseURL = `${rawBaseURL.replace(/\/+$/, '').replace(/\/api$/, '')}/api`;
 
 const api = axios.create({
     baseURL: cleanBaseURL,

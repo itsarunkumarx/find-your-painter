@@ -17,14 +17,12 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.js',
-      injectRegister: false,
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg', 'icons/*.png'],
+      injectRegister: false,
       manifest: {
-        name: 'Find Your Painter',
-        short_name: 'PainterApp',
-        description: 'Find professional painters for your home',
         theme_color: '#ffffff',
+        display: 'standalone',
+        appleMobileWebAppCapable: 'no', // Disable deprecated tag injection
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
