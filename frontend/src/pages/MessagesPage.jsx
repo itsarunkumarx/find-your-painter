@@ -1,30 +1,36 @@
 import { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
+import { useSocket } from '../context/SocketContext';
 import { useTranslation } from 'react-i18next';
-import { io } from 'socket.io-client';
-import { FaInbox, FaComments, FaSearch, FaCircle, FaPaintBrush, FaUserTie } from 'react-icons/fa';
+import { FaInbox, FaComments, FaSearch, FaCircle, FaPaintBrush, FaUserTie, FaCheck, FaCheckDouble } from 'react-icons/fa';
+import { useLocation } from 'react-router-dom';
 import Chat from '../components/Chat';
 
 const MessagesPage = () => {
     const { t } = useTranslation();
+    if (!t) return null;
     const { user } = useAuth();
+    const { socket, onlineUsers } = useSocket();
+    const location = useLocation();
     const [conversations, setConversations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedChat, setSelectedChat] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
-    const [onlineUsers, setOnlineUsers] = useState([]);
-    const socketRef = useRef(null);
+    const [typingStatus, setTypingStatus] = useState({}); // { bookingId: userName }
 
     const fetchConversations = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const { data } = await axios.get(
-                `${import.meta.env.VITE_API_URL}/api/chat/conversations`,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            const { data } = await api.get('/chat/conversations');
             setConversations(data);
+
+            // Handle initial deep-linking from Explore page
+            const initialId = location.state?.initialBookingId;
+            if (initialId && !selectedChat) {
+                const target = data.find(c => c.booking._id === initialId);
+                if (target) setSelectedChat(target.booking);
+            }
         } catch (error) {
             console.error('Fetch conversations failed', error);
         } finally {
@@ -34,22 +40,55 @@ const MessagesPage = () => {
 
     useEffect(() => {
         fetchConversations();
+        if (!socket) return;
 
-        // Socket for real-time conversation updates
-        const socket = io(import.meta.env.VITE_SOCKET_URL);
-        socketRef.current = socket;
-        socket.emit('user_online', user._id);
-        socket.on('online_users', (users) => setOnlineUsers(users));
-        socket.on('new_message', () => fetchConversations());
+        const handleNewMessage = () => fetchConversations();
+        const handleTyping = ({ bookingId, userId, userName }) => {
+            if (userId !== user._id) {
+                setTypingStatus(prev => ({ ...prev, [bookingId]: userName }));
+            }
+        };
+        const handleStopTyping = ({ bookingId, userId }) => {
+            if (userId !== user._id) {
+                setTypingStatus(prev => {
+                    const next = { ...prev };
+                    delete next[bookingId];
+                    return next;
+                });
+            }
+        };
+        const handleMessagesRead = ({ bookingId, userId }) => {
+            if (userId === user._id) {
+                // If I am the one who read them (maybe in another tab), sync my local UI
+                setConversations(prev => prev.map(c =>
+                    c.booking._id === bookingId ? { ...c, unreadCount: 0 } : c
+                ));
+            } else {
+                // If the other person read my messages, show the blue checkmark
+                setConversations(prev => prev.map(c =>
+                    c.booking._id === bookingId
+                        ? { ...c, lastMessage: c.lastMessage ? { ...c.lastMessage, read: true } : c.lastMessage }
+                        : c
+                ));
+            }
+        };
 
-        return () => socket.disconnect();
-    }, [user._id]);
+        socket.on('new_message', handleNewMessage);
+        socket.on('user_typing', handleTyping);
+        socket.on('user_stop_typing', handleStopTyping);
+        socket.on('messages_read', handleMessagesRead);
+
+        return () => {
+            socket.off('new_message', handleNewMessage);
+            socket.off('user_typing', handleTyping);
+            socket.off('user_stop_typing', handleStopTyping);
+            socket.off('messages_read', handleMessagesRead);
+        };
+    }, [socket, user._id]);
 
     const getOtherUser = (conv) => {
-        if (user.role === 'user') return conv.booking.worker?.user;
-        if (user.role === 'worker') return conv.booking.user;
-        // admin: show both
-        return conv.booking.user;
+        // Use the deduplicated otherUser field from the backend
+        return conv.otherUser || (user.role === 'user' ? conv.booking.worker?.user : conv.booking.user);
     };
 
     const filteredConversations = conversations.filter(conv => {
@@ -57,7 +96,7 @@ const MessagesPage = () => {
         return other?.name?.toLowerCase().includes(searchTerm.toLowerCase());
     });
 
-    const totalUnread = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+    const totalUnread = filteredConversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
 
     const handleSelectChat = (conv) => {
         setSelectedChat(conv.booking);
@@ -68,46 +107,41 @@ const MessagesPage = () => {
     };
 
     return (
-        <div className="h-[calc(100vh-100px)] flex flex-col space-y-4">
+        <div className="h-[calc(100vh-80px)] sm:h-[calc(100vh-100px)] flex flex-col space-y-4">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${selectedChat ? 'hidden sm:flex' : ''}`}>
                 <div>
-                    <h1 className="text-3xl font-black text-navy-deep tracking-tight">
+                    <h1 className="text-2xl sm:text-3xl font-black text-navy-deep tracking-tight">
                         Messages <span className="text-royal-gold">Hub</span>
                         {totalUnread > 0 && (
-                            <span className="ml-3 px-3 py-1 bg-royal-gold text-navy-deep text-xs font-black rounded-full animate-pulse">
+                            <span className="ml-3 px-3 py-1 bg-royal-gold text-navy-deep text-[10px] sm:text-xs font-black rounded-full animate-pulse">
                                 {totalUnread} new
                             </span>
                         )}
                     </h1>
-                    <p className="text-slate-400 text-xs font-medium mt-1 uppercase tracking-widest">
+                    <p className="text-slate-400 text-[10px] font-medium mt-1 uppercase tracking-widest">
                         {user.role === 'admin' ? 'All Platform Conversations' : user.role === 'worker' ? 'Client Communications' : 'Chat with your Painters'}
                     </p>
                 </div>
-                <div className="relative w-64">
+                <div className="relative w-full sm:w-64">
                     <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-navy-deep/20 text-xs" />
                     <input
                         type="text"
-                        placeholder="Search conversations..."
+                        placeholder="Search..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full bg-white border border-royal-gold/10 rounded-2xl py-3 pl-11 pr-4 text-xs font-bold text-navy-deep placeholder-navy-deep/20 focus:outline-none focus:border-royal-gold transition-all shadow-sm"
+                        className="w-full bg-white border border-royal-gold/10 rounded-2xl py-2.5 sm:py-3 pl-11 pr-4 text-[11px] sm:text-xs font-bold text-navy-deep placeholder-navy-deep/20 focus:outline-none focus:border-royal-gold transition-all shadow-sm"
                     />
                 </div>
             </div>
 
-            <div className="flex-1 bg-white rounded-[2.5rem] border border-royal-gold/10 shadow-2xl shadow-royal-gold/5 overflow-hidden flex min-h-0">
+            <div className="flex-1 bg-white rounded-2xl sm:rounded-[2.5rem] border border-royal-gold/10 shadow-2xl shadow-royal-gold/5 overflow-hidden flex min-h-0 relative">
                 {/* Conversations Sidebar */}
-                <div className="w-72 border-r border-royal-gold/5 flex flex-col shrink-0">
-                    <div className="px-6 py-4 border-b border-royal-gold/5 bg-ivory-subtle/30 flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-navy-deep/40">
-                            Conversations ({filteredConversations.length})
+                <div className={`${selectedChat ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-royal-gold/5 flex-col shrink-0`}>
+                    <div className="px-5 sm:px-6 py-4 border-b border-royal-gold/5 bg-ivory-subtle/30 flex items-center justify-between">
+                        <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.3em] text-navy-deep/40">
+                            Intel Stream ({filteredConversations.length})
                         </span>
-                        {user.role === 'admin' && (
-                            <span className="flex items-center gap-1.5 text-[9px] font-black text-royal-gold uppercase tracking-widest">
-                                <FaUserTie size={8} /> All Roles
-                            </span>
-                        )}
                     </div>
                     <div className="flex-1 overflow-y-auto">
                         <AnimatePresence mode="popLayout">
@@ -141,26 +175,40 @@ const MessagesPage = () => {
                                                 <div className="w-11 h-11 rounded-xl bg-navy-deep/5 border border-navy-deep/10 flex items-center justify-center font-black text-navy-deep uppercase text-base group-hover:border-royal-gold/20 transition-colors">
                                                     {(otherUser?.name || 'U').charAt(0)}
                                                 </div>
-                                                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${isOnline ? 'bg-green-500' : 'bg-slate-300'}`} />
+                                                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white transition-colors duration-500 ${isOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-slate-300'}`} />
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between">
                                                     <span className={`text-[11px] font-black uppercase tracking-wider truncate group-hover:text-royal-gold transition-colors ${hasUnread ? 'text-navy-deep' : 'text-navy-deep/70'}`}>
                                                         {otherUser?.name}
                                                     </span>
-                                                    {hasUnread && (
-                                                        <span className="shrink-0 w-5 h-5 bg-royal-gold text-navy-deep text-[9px] font-black rounded-full flex items-center justify-center ml-1">
-                                                            {conv.unreadCount}
-                                                        </span>
-                                                    )}
+                                                    <div className="flex items-center gap-2">
+                                                        {conv.lastMessage && conv.lastMessage.sender?._id === user._id && (
+                                                            conv.lastMessage.read ? <FaCheckDouble size={10} className="text-royal-gold" /> : <FaCheck size={10} className="text-navy-deep/20" />
+                                                        )}
+                                                        {hasUnread && (
+                                                            <span className="shrink-0 w-5 h-5 bg-royal-gold text-navy-deep text-[9px] font-black rounded-full flex items-center justify-center">
+                                                                {conv.unreadCount}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className="text-[9px] text-navy-deep/40 font-bold truncate mt-0.5 flex items-center gap-1.5">
-                                                    {user.role === 'admin' && (
-                                                        <span className="text-royal-gold/60 uppercase">
-                                                            {conv.booking.worker?.user?.name} ↔ {conv.booking.user?.name}
+                                                <div className="text-[9px] font-bold truncate mt-0.5">
+                                                    {typingStatus[conv.booking._id] ? (
+                                                        <span className="text-royal-gold animate-pulse flex items-center gap-1 uppercase tracking-widest">
+                                                            <span className="w-1 h-1 bg-royal-gold rounded-full animate-bounce" />
+                                                            Typing...
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-navy-deep/40 flex items-center gap-1.5">
+                                                            {user.role === 'admin' && (
+                                                                <span className="text-royal-gold/60 uppercase shrink-0">
+                                                                    {conv.booking.worker?.user?.name?.split(' ')[0]} ↔ {conv.booking.user?.name?.split(' ')[0]}
+                                                                </span>
+                                                            )}
+                                                            {user.role !== 'admin' && (conv.lastMessage?.message || 'New communication link established')}
                                                         </span>
                                                     )}
-                                                    {user.role !== 'admin' && (conv.lastMessage?.message || 'No messages yet')}
                                                 </div>
                                             </div>
                                         </motion.div>
@@ -179,7 +227,7 @@ const MessagesPage = () => {
                 </div>
 
                 {/* Main Chat Area */}
-                <div className="flex-1 bg-slate-50/40 flex flex-col items-center justify-center relative overflow-hidden">
+                <div className={`${!selectedChat ? 'hidden md:flex' : 'flex'} flex-1 bg-slate-50/40 flex-col items-center justify-center relative overflow-hidden`}>
                     <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
                         style={{ backgroundImage: 'radial-gradient(circle, #D4AF37 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
 
