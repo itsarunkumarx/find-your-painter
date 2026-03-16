@@ -1,43 +1,60 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaBell, FaCheckCircle, FaClock, FaExclamationTriangle, FaTrash, FaCheckDouble } from 'react-icons/fa';
 import { formatDistanceToNow } from 'date-fns';
+import { io } from 'socket.io-client';
+import { useAuth } from '../hooks/useAuth';
 
+import { useTranslation } from 'react-i18next';
 const NotificationsPage = () => {
+    const { t } = useTranslation();
+    if (!t) return null;
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
-    const token = localStorage.getItem('token');
-    const config = { headers: { Authorization: `Bearer ${token}` } };
 
     const fetchNotifications = async () => {
         try {
-            const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/notifications`, config);
+            const { data } = await api.get('/notifications');
             setNotifications(data);
         } catch (e) { console.error(e); } finally { setLoading(false); }
     };
 
+    const { user } = useAuth();
+
     useEffect(() => {
         fetchNotifications();
-    }, []);
+
+        const socket = io(import.meta.env.VITE_API_URL);
+        socket.on('new_notification', (data) => {
+            if (data.userId && data.userId !== user?._id) return;
+            if (data.targetRole && data.targetRole !== 'all' && data.targetRole !== user?.role) return;
+            fetchNotifications();
+        });
+
+        return () => socket.disconnect();
+    }, [user]);
 
     const markAllRead = async () => {
         try {
-            await axios.put(`${import.meta.env.VITE_API_URL}/api/notifications/read-all`, {}, config);
+            await api.put('/notifications/read-all');
             setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+            // Trigger a re-render or event to refresh sidebar if needed, 
+            // but usually sidebar fetches on focus or we can use a custom event.
+            window.dispatchEvent(new Event('notifications_read'));
         } catch (e) { console.error(e); }
     };
 
     const markRead = async (id) => {
         try {
-            await axios.put(`${import.meta.env.VITE_API_URL}/api/notifications/${id}/read`, {}, config);
+            await api.put(`/notifications/${id}/read`);
             setNotifications(prev => prev.map(n => n._id === id ? { ...n, read: true } : n));
         } catch (e) { console.error(e); }
     };
 
     const deleteNotif = async (id) => {
         try {
-            await axios.delete(`${import.meta.env.VITE_API_URL}/api/notifications/${id}`, config);
+            await api.delete(`/notifications/${id}`);
             setNotifications(prev => prev.filter(n => n._id !== id));
         } catch (e) { console.error(e); }
     };
