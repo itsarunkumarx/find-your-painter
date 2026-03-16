@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { AuthContext } from './AuthContextDefinition';
 import { subscribeToNotifications } from '../utils/pushNotifications';
 
@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (email, password) => {
         try {
-            const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/login`, { email, password });
+            const { data } = await api.post('/auth/login', { email, password });
             localStorage.setItem('token', data.token);
             localStorage.setItem('user', JSON.stringify(data));
             setUser(data);
@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }) => {
 
     const googleLogin = async (access_token) => {
         try {
-            const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/google`, { access_token });
+            const { data } = await api.post('/auth/google', { access_token });
             localStorage.setItem('token', data.token);
             localStorage.setItem('user', JSON.stringify(data));
             setUser(data);
@@ -46,7 +46,7 @@ export const AuthProvider = ({ children }) => {
 
     const register = async (userData) => {
         try {
-            const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/register`, userData);
+            const { data } = await api.post('/auth/register', userData);
             localStorage.setItem('token', data.token);
             localStorage.setItem('user', JSON.stringify(data));
             setUser(data);
@@ -62,8 +62,14 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
+    const updateUser = (userData) => {
+        const updatedUser = { ...user, ...userData };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+    };
+
     return (
-        <AuthContext.Provider value={{ user, loading, login, googleLogin, register, logout }}>
+        <AuthContext.Provider value={{ user, loading, login, googleLogin, register, logout, updateUser }}>
             {children}
         </AuthContext.Provider>
     );
