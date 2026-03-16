@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import DashboardHeader from './DashboardHeader';
 import InstallApp from './InstallApp';
 
 const DashboardLayout = () => {
@@ -29,7 +30,8 @@ const DashboardLayout = () => {
             <main
                 className={`flex-1 transition-all duration-300 ease-in-out ${isMobile ? 'pl-0' : 'pl-[280px]'}`}
             >
-                <div className="p-8 max-w-7xl mx-auto">
+                <div className="p-4 sm:p-8 max-w-7xl mx-auto">
+                    <DashboardHeader />
                     <Outlet />
                 </div>
             </main>
