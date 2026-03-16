@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { motion } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { FaRupeeSign, FaArrowUp, FaCalendarAlt, FaUser, FaMapMarkerAlt, FaUniversity, FaCreditCard, FaSave } from 'react-icons/fa';
@@ -7,7 +7,11 @@ import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
 } from 'recharts';
 
+import { useTranslation } from 'react-i18next';
+
 const EarningsPage = () => {
+    const { t } = useTranslation();
+    if (!t) return null;
     const { user } = useAuth();
     const [earnings, setEarnings] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -16,15 +20,14 @@ const EarningsPage = () => {
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
 
-    const token = localStorage.getItem('token');
-    const config = { headers: { Authorization: `Bearer ${token}` } };
+
 
     useEffect(() => {
         const fetch = async () => {
             try {
                 const [earningsRes, profileRes] = await Promise.all([
-                    axios.get(`${import.meta.env.VITE_API_URL}/api/workers/earnings`, config),
-                    axios.get(`${import.meta.env.VITE_API_URL}/api/workers/profile`, config),
+                    api.get('/workers/earnings'),
+                    api.get('/workers/profile'),
                 ]);
                 setEarnings(earningsRes.data);
                 if (profileRes.data.paymentDetails) {
@@ -38,7 +41,7 @@ const EarningsPage = () => {
     const savePayDetails = async () => {
         setSaving(true);
         try {
-            await axios.put(`${import.meta.env.VITE_API_URL}/api/workers/payment-details`, payDetails, config);
+            await api.put('/workers/payment-details', payDetails);
             setSaved(true);
             setTimeout(() => setSaved(false), 2500);
         } catch (e) { console.error(e); } finally { setSaving(false); }
@@ -97,7 +100,7 @@ const EarningsPage = () => {
                         <div>
                             <p className="text-[9px] font-black uppercase tracking-[0.3em] text-navy-deep/30 mb-6">Monthly Earnings (₹)</p>
                             {earnings?.monthlyChart?.length > 0 ? (
-                                <ResponsiveContainer width="100%" height={280}>
+                                <ResponsiveContainer width="100%" height={280} minHeight={280}>
                                     <AreaChart data={earnings.monthlyChart}>
                                         <defs>
                                             <linearGradient id="earningsGrad" x1="0" y1="0" x2="0" y2="1">
