@@ -60,7 +60,7 @@ const EntryPage = () => {
     const handleInstallClick = async () => {
         if (!deferredPrompt) {
             // Provide immediate feedback if the signal hasn't fired yet
-            alert("To install directly: Click your browser's 'Menu' (three dots) and select 'Install App' or 'Add to Home Screen'.");
+            alert(t('manual_install_alert'));
             return;
         }
 
@@ -103,15 +103,15 @@ const EntryPage = () => {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 1 }}
-                    className="text-center mb-24"
+                    className="text-center mb-12 sm:mb-24"
                 >
                     <div className="subtitle-royal justify-center">
                         {t('professional_network')}
                     </div>
-                    <h1 className="title-royal mb-8">
+                    <h1 className="title-royal mb-6 sm:mb-8 text-4xl sm:text-6xl md:text-8xl">
                         {t('hero_title')}
                     </h1>
-                    <p className="max-w-2xl mx-auto text-[var(--text-muted)] text-lg md:text-xl font-medium leading-relaxed mb-12">
+                    <p className="max-w-2xl mx-auto text-[var(--text-muted)] text-base sm:text-lg md:text-xl font-medium leading-relaxed mb-8 sm:mb-12 px-4 sm:px-0">
                         {t('tagline') || "Connect with verified artisans and transform your space with the platform of authority."}
                     </p>
 
@@ -121,7 +121,7 @@ const EntryPage = () => {
                             <button
                                 onClick={() => setLangOpen(prev => !prev)}
                                 className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-[var(--bg-highlight)]/60 border border-[var(--glass-border)] backdrop-blur-xl shadow-sm text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all text-sm font-bold"
-                                aria-label="Select Language"
+                                aria-label={t('select_language')}
                             >
                                 <FaGlobe className="text-royal-gold text-base" />
                                 <span>{currentLang.flag} {currentLang.label}</span>
@@ -166,7 +166,7 @@ const EntryPage = () => {
                                         className="inline-flex items-center gap-3 px-10 py-5 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-2xl hover:shadow-yellow-500/40 transition-all group"
                                     >
                                         <FaDownload className="group-hover:translate-y-0.5 transition-transform" />
-                                        {deferredPrompt ? 'Install App' : 'Add to Home Screen'}
+                                        {deferredPrompt ? t('install_now') : t('install_now')}
                                     </motion.button>
                                 )}
 
@@ -180,7 +180,7 @@ const EntryPage = () => {
                                         className="inline-flex items-center gap-3 px-10 py-5 bg-[var(--bg-highlight)] border border-royal-gold/30 text-royal-gold rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl hover:bg-royal-gold/10 transition-all"
                                     >
                                         <FaAndroid className="text-green-400 text-lg" />
-                                        Download APK
+                                        {t('download_apk')}
                                     </motion.a>
                                 )}
                             </div>
@@ -193,10 +193,10 @@ const EntryPage = () => {
                                     className="mt-6 p-4 rounded-xl border border-dashed border-royal-gold/20 bg-royal-gold/5 max-w-md text-center"
                                 >
                                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-royal-gold mb-2 flex items-center justify-center gap-2">
-                                        <FaApple /> Install on iOS
+                                        <FaApple /> {t('pwa_feature')}
                                     </p>
                                     <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
-                                        Tap <span className="text-[var(--text-main)] font-bold">Share</span> then <span className="text-[var(--text-main)] font-bold">"Add to Home Screen"</span> in Safari.
+                                        {t('share_step')}
                                     </p>
                                 </motion.div>
                             )}
@@ -209,31 +209,31 @@ const EntryPage = () => {
                                     className="mt-6 p-4 rounded-xl border border-dashed border-royal-gold/20 bg-royal-gold/5 max-w-md text-center"
                                 >
                                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-royal-gold mb-2">
-                                        Manual Install Mode
+                                        {t('manual_install_mode')}
                                     </p>
                                     <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
-                                        Click <span className="text-[var(--text-main)] font-bold">Menu (⋮)</span> and select <span className="text-[var(--text-main)] font-bold">"Install App"</span> in Chrome.
+                                        {t('menu_step')}
                                     </p>
                                 </motion.div>
                             )}
 
                             <p className="mt-4 text-[10px] font-black uppercase tracking-[0.2em] text-royal-gold animate-pulse">
-                                Get Native Performance & Call Notifications
+                                {t('native_performance_tip')}
                             </p>
                         </div>
                     )}
 
                     {/* Action Hub */}
-                    <div className="flex flex-col md:flex-row gap-6 justify-center items-center">
+                    <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center">
                         <button
                             onClick={() => navigate('/roles')}
-                            className="btn-primary min-w-[280px]"
+                            className="w-full sm:w-auto btn-primary px-8 py-4 sm:px-10 sm:py-5 min-w-[240px] sm:min-w-[280px]"
                         >
                             {t('customer_btn')}
                         </button>
                         <button
                             onClick={() => navigate('/roles')}
-                            className="min-w-[280px] px-10 py-5 rounded-[2rem] border-2 border-royal-gold text-royal-gold font-black uppercase tracking-widest text-sm hover:bg-royal-gold hover:text-white transition-all duration-300 shadow-md hover:shadow-royal-gold/30"
+                            className="w-full sm:w-auto px-8 py-4 sm:px-10 sm:py-5 min-w-[240px] sm:min-w-[280px] rounded-[2rem] border-2 border-royal-gold text-royal-gold font-black uppercase tracking-widest text-sm hover:bg-royal-gold hover:text-white transition-all duration-300 shadow-md hover:shadow-royal-gold/30"
                         >
                             {t('painter_btn')}
                         </button>
@@ -245,10 +245,10 @@ const EntryPage = () => {
                     initial={{ opacity: 0 }}
                     whileInView={{ opacity: 1 }}
                     viewport={{ once: true }}
-                    className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-5xl mx-auto mb-24"
+                    className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-w-5xl mx-auto mb-16 sm:mb-24"
                 >
-                    <StatCard icon={FaPaintRoller} value="1,200+" label={t('stat_painters')} />
-                    <StatCard icon={FaHome} value="5,000+" label={t('stat_homes')} />
+                    <StatCard icon={FaPaintRoller} value="1.2k+" label={t('stat_painters')} />
+                    <StatCard icon={FaHome} value="5k+" label={t('stat_homes')} />
                     <StatCard icon={FaCity} value="50+" label={t('stat_cities')} />
                     <StatCard icon={FaShieldAlt} value="100%" label={t('stat_id')} />
                 </motion.section>
@@ -258,22 +258,22 @@ const EntryPage = () => {
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    className="grid md:grid-cols-3 gap-8"
+                    className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8"
                 >
-                    <div className="glass-card p-10 group">
-                        <FaUserFriends className="text-royal-gold text-3xl mb-6 transition-transform duration-500 group-hover:scale-110" />
-                        <h3 className="text-2xl font-black text-[var(--text-main)] mb-4">{t('feature_matching_title')}</h3>
-                        <p className="text-[var(--text-muted)] leading-relaxed">{t('feature_matching_desc')}</p>
+                    <div className="glass-card p-8 sm:p-10 group">
+                        <FaUserFriends className="text-royal-gold text-2xl sm:text-3xl mb-4 sm:mb-6 transition-transform duration-500 group-hover:scale-110" />
+                        <h3 className="text-xl sm:text-2xl font-black text-[var(--text-main)] mb-3 sm:mb-4">{t('feature_matching_title')}</h3>
+                        <p className="text-[var(--text-muted)] text-sm leading-relaxed">{t('feature_matching_desc')}</p>
                     </div>
-                    <div className="glass-card p-10 group">
-                        <FaShieldAlt className="text-royal-gold text-3xl mb-6 transition-transform duration-500 group-hover:scale-110" />
-                        <h3 className="text-2xl font-black text-[var(--text-main)] mb-4">{t('feature_security_title')}</h3>
-                        <p className="text-[var(--text-muted)] leading-relaxed">{t('feature_security_desc')}</p>
+                    <div className="glass-card p-8 sm:p-10 group">
+                        <FaShieldAlt className="text-royal-gold text-2xl sm:text-3xl mb-4 sm:mb-6 transition-transform duration-500 group-hover:scale-110" />
+                        <h3 className="text-xl sm:text-2xl font-black text-[var(--text-main)] mb-3 sm:mb-4">{t('feature_security_title')}</h3>
+                        <p className="text-[var(--text-muted)] text-sm leading-relaxed">{t('feature_security_desc')}</p>
                     </div>
-                    <div className="glass-card p-10 group">
-                        <FaHome className="text-royal-gold text-3xl mb-6 transition-transform duration-500 group-hover:scale-110" />
-                        <h3 className="text-2xl font-black text-[var(--text-main)] mb-4">{t('feature_artistry_title')}</h3>
-                        <p className="text-[var(--text-muted)] leading-relaxed">{t('feature_artistry_desc')}</p>
+                    <div className="glass-card p-8 sm:p-10 group">
+                        <FaHome className="text-royal-gold text-2xl sm:text-3xl mb-4 sm:mb-6 transition-transform duration-500 group-hover:scale-110" />
+                        <h3 className="text-xl sm:text-2xl font-black text-[var(--text-main)] mb-3 sm:mb-4">{t('feature_artistry_title')}</h3>
+                        <p className="text-[var(--text-muted)] text-sm leading-relaxed">{t('feature_artistry_desc')}</p>
                     </div>
                 </motion.section>
             </div>
