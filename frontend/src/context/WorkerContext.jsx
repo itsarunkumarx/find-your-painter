@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import axios from 'axios';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import api from '../utils/api';
 import { WorkerContext } from './WorkerContextDefinition';
 import { useAuth } from '../hooks/useAuth';
 
@@ -11,6 +11,7 @@ export const WorkerProvider = ({ children }) => {
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     // Prevent redundant fetches
     const lastFetchRef = useRef(0);
@@ -22,16 +23,15 @@ export const WorkerProvider = ({ children }) => {
         const now = Date.now();
         if (!force && now - lastFetchRef.current < 5000) return;
 
-        setLoading(true);
+        if (force) setLoading(true);
+        else setIsRefreshing(true);
+        
         setError(null);
         try {
-            const token = localStorage.getItem('token');
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-
             const [bookingsRes, workerRes, earningsRes] = await Promise.all([
-                axios.get(`${import.meta.env.VITE_API_URL}/api/bookings/worker-bookings`, config).catch(() => ({ data: [] })),
-                axios.get(`${import.meta.env.VITE_API_URL}/api/workers/profile`, config).catch(() => ({ data: null })),
-                axios.get(`${import.meta.env.VITE_API_URL}/api/workers/earnings`, config).catch(() => ({ data: null }))
+                api.get('/bookings/worker-bookings').catch(() => ({ data: [] })),
+                api.get('/workers/profile').catch(() => ({ data: null })),
+                api.get('/workers/earnings').catch(() => ({ data: null }))
             ]);
 
             const workerData = workerRes.data;
@@ -40,7 +40,7 @@ export const WorkerProvider = ({ children }) => {
             setEarnings(earningsRes.data);
 
             if (workerData?._id) {
-                const reviewsRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/reviews/worker/${workerData._id}`, config).catch(() => ({ data: [] }));
+                const reviewsRes = await api.get(`/reviews/worker/${workerData._id}`).catch(() => ({ data: [] }));
                 setReviews(reviewsRes.data || []);
             }
 
@@ -50,12 +50,20 @@ export const WorkerProvider = ({ children }) => {
             setError(err.message || 'Failed to fetch worker intelligence');
         } finally {
             setLoading(false);
+            setIsRefreshing(false);
         }
     }, [user]);
 
     useEffect(() => {
         if (user?.role === 'worker') {
-            refreshData();
+            refreshData(true);
+
+            // Auto-refresh every 60 seconds
+            const interval = setInterval(() => {
+                refreshData(false);
+            }, 60000);
+
+            return () => clearInterval(interval);
         } else {
             setLoading(false);
         }
@@ -63,12 +71,10 @@ export const WorkerProvider = ({ children }) => {
 
     const updateBookingStatus = async (id, status, subStatus = null) => {
         try {
-            const token = localStorage.getItem('token');
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            const { data } = await axios.put(`${import.meta.env.VITE_API_URL}/api/bookings/${id}/status`, {
+            const { data } = await api.put(`/bookings/${id}/status`, {
                 status,
                 subStatus
-            }, config);
+            });
 
             // Update local state immediately
             setBookings(prev => prev.map(b => b._id === id ? { ...b, ...data } : b));
@@ -85,11 +91,9 @@ export const WorkerProvider = ({ children }) => {
     const toggleAvailability = async () => {
         if (!worker) return { success: false, message: 'Identity not found' };
         try {
-            const token = localStorage.getItem('token');
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            const { data } = await axios.put(`${import.meta.env.VITE_API_URL}/api/workers/availability`, {
+            const { data } = await api.put('/workers/availability', {
                 isAvailable: !worker.isAvailable
-            }, config);
+            });
 
             setWorker(prev => ({ ...prev, isAvailable: data.isAvailable }));
             return { success: true, isAvailable: data.isAvailable };
@@ -101,9 +105,7 @@ export const WorkerProvider = ({ children }) => {
 
     const confirmPayment = async (id) => {
         try {
-            const token = localStorage.getItem('token');
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.post(`${import.meta.env.VITE_API_URL}/api/payments/confirm-cash-payment`, { bookingId: id }, config);
+            await api.post('/payments/confirm-cash-payment', { bookingId: id });
             setBookings(prev => prev.map(b => b._id === id ? { ...b, paymentStatus: 'paid' } : b));
             return { success: true };
         } catch (error) {
@@ -112,18 +114,28 @@ export const WorkerProvider = ({ children }) => {
         }
     };
 
-    const value = {
+    const value = useMemo(() => ({
         bookings,
         worker,
         earnings,
         reviews,
         loading,
+        isRefreshing,
         error,
         refreshData,
         updateBookingStatus,
         toggleAvailability,
         confirmPayment
-    };
+    }), [
+        bookings,
+        worker,
+        earnings,
+        reviews,
+        loading,
+        isRefreshing,
+        error,
+        refreshData
+    ]);
 
     return <WorkerContext.Provider value={value}>{children}</WorkerContext.Provider>;
 };
