@@ -11,7 +11,10 @@ const userSchema = new mongoose.Schema({
     language: { type: String, default: 'en' },
     address: { type: String, default: '' },
     phoneNumber: { type: String },
+    customRingtone: { type: String, default: '' },
+    customOutgoingTone: { type: String, default: '' },
     isBlocked: { type: Boolean, default: false },
+    isSuspended: { type: Boolean, default: false },
     uiPreferences: {
         accentColor: { type: String, default: '#C5A059' },
         glowIntensity: { type: Number, default: 50 },
@@ -19,8 +22,18 @@ const userSchema = new mongoose.Schema({
     },
     notifications: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Notification' }],
     recentlyViewed: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }],
-    savedWorkers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }]
+    savedWorkers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }],
+    pushSubscription: {
+        endpoint: String,
+        keys: {
+            p256dh: String,
+            auth: String
+        }
+    }
 }, { timestamps: true });
+
+// Performance Indices
+userSchema.index({ role: 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
