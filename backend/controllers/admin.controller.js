@@ -3,6 +3,33 @@ import { Worker } from '../models/Worker.js';
 import { Booking } from '../models/Booking.js';
 import { Review } from '../models/Review.js';
 import { Notification } from '../models/Notification.js';
+import { AuditLog } from '../models/AuditLog.js';
+import { Settings } from '../models/Settings.js';
+
+const logAction = async (adminId, type, subject, action) => {
+    try {
+        await AuditLog.create({
+            admin: adminId,
+            type,
+            subject,
+            action
+        });
+    } catch (error) {
+        console.error('Audit logging failed', error);
+    }
+};
+
+export const getAuditLogs = async (req, res) => {
+    try {
+        const logs = await AuditLog.find()
+            .populate('admin', 'name email')
+            .sort({ createdAt: -1 })
+            .limit(100);
+        res.json(logs);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
 
 export const getAdminStats = async (req, res) => {
     try {
@@ -65,6 +92,13 @@ export const toggleWorkerBlock = async (req, res) => {
         user.isBlocked = !user.isBlocked;
         await user.save();
 
+        await logAction(
+            req.user._id,
+            user.isBlocked ? 'worker_block' : 'user_unblock',
+            user.name,
+            `${user.isBlocked ? 'Blocked' : 'Unblocked'} worker user account`
+        );
+
         res.json({ message: `User ${user.isBlocked ? 'blocked' : 'unblocked'} successfully`, isBlocked: user.isBlocked });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -87,7 +121,107 @@ export const toggleUserBlock = async (req, res) => {
 
         user.isBlocked = !user.isBlocked;
         await user.save();
+
+        await logAction(
+            req.user._id,
+            user.isBlocked ? 'user_block' : 'user_unblock',
+            user.name,
+            `${user.isBlocked ? 'Restricted' : 'Restored'} user access`
+        );
+
         res.json(user);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const toggleUserSuspension = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        user.isSuspended = !user.isSuspended;
+        await user.save();
+
+        await logAction(
+            req.user._id,
+            user.isSuspended ? 'user_suspend' : 'user_unsuspend',
+            user.name,
+            `${user.isSuspended ? 'Suspended' : 'Unsuspended'} user account`
+        );
+
+        res.json(user);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const deleteUser = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        const userName = user.name;
+        await User.findByIdAndDelete(req.params.id);
+
+        await logAction(
+            req.user._id,
+            'user_delete',
+            userName,
+            `Permanently deleted user account`
+        );
+
+        res.json({ message: 'User deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const toggleWorkerSuspension = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const worker = await Worker.findById(id).populate('user');
+        if (!worker) return res.status(404).json({ message: 'Worker not found' });
+
+        const user = await User.findById(worker.user._id);
+        user.isSuspended = !user.isSuspended;
+        await user.save();
+
+        await logAction(
+            req.user._id,
+            user.isSuspended ? 'user_suspend' : 'user_unsuspend',
+            user.name,
+            `${user.isSuspended ? 'Suspended' : 'Unsuspended'} worker account`
+        );
+
+        res.json({ message: `User ${user.isSuspended ? 'suspended' : 'unsuspended'} successfully`, isSuspended: user.isSuspended });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const deleteWorker = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const worker = await Worker.findById(id);
+        if (!worker) return res.status(404).json({ message: 'Worker not found' });
+
+        const userId = worker.user;
+
+        const userName = worker.fullName || 'Unknown';
+        
+        // Delete worker profile and user account
+        await Worker.findByIdAndDelete(id);
+        await User.findByIdAndDelete(userId);
+
+        await logAction(
+            req.user._id,
+            'user_delete',
+            userName,
+            `Permanently deleted worker profile and account`
+        );
+
+        res.json({ message: 'Worker and associated user deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -126,7 +260,43 @@ export const getPlatformRevenueData = async (req, res) => {
 };
 
 export const updatePlatformSettings = async (req, res) => {
-    res.json({ message: 'Settings updated' });
+    try {
+        const { settings } = req.body; // Expecting an object of key-value pairs
+        
+        const updates = Object.entries(settings).map(([key, value]) => 
+            Settings.findOneAndUpdate(
+                { key },
+                { value, updatedBy: req.user._id },
+                { upsert: true, new: true }
+            )
+        );
+
+        await Promise.all(updates);
+
+        await logAction(
+            req.user._id,
+            'settings_update',
+            'SYSTEM',
+            `Updated platform-wide configuration`
+        );
+
+        res.json({ message: 'Settings updated successfully' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const getPlatformSettings = async (req, res) => {
+    try {
+        const settings = await Settings.find();
+        const settingsMap = settings.reduce((acc, curr) => {
+            acc[curr.key] = curr.value;
+            return acc;
+        }, {});
+        res.json(settingsMap);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
 };
 
 export const getServiceTypeBreakdown = async (req, res) => {
@@ -204,8 +374,15 @@ export const sendGlobalNotification = async (req, res) => {
         ));
 
         if (req.io) {
-            req.io.emit('new_notification', { title, message });
+            req.io.emit('new_notification', { title, message, targetRole });
         }
+
+        await logAction(
+            req.user._id,
+            'broadcast_sent',
+            targetRole || 'all',
+            `Sent broadcast: ${title}`
+        );
 
         res.json({ message: `Notification sent to ${users.length} users` });
     } catch (error) {
