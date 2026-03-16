@@ -11,13 +11,16 @@ export const updateProfile = async (req, res) => {
             user.phoneNumber = req.body.phoneNumber || user.phoneNumber;
             user.profileImage = req.body.profileImage || user.profileImage;
             user.address = req.body.address || user.address;
+            user.customRingtone = req.body.customRingtone || user.customRingtone;
+            user.customOutgoingTone = req.body.customOutgoingTone || user.customOutgoingTone;
             if (req.body.password) user.password = req.body.password;
             const updatedUser = await user.save();
             res.json({
                 _id: updatedUser._id, name: updatedUser.name, email: updatedUser.email,
                 role: updatedUser.role, phoneNumber: updatedUser.phoneNumber,
                 profileImage: updatedUser.profileImage, uiPreferences: updatedUser.uiPreferences,
-                address: updatedUser.address,
+                address: updatedUser.address, customRingtone: updatedUser.customRingtone,
+                customOutgoingTone: updatedUser.customOutgoingTone
             });
         } else { res.status(404).json({ message: 'User not found' }); }
     } catch (error) { res.status(500).json({ message: error.message }); }
@@ -120,6 +123,68 @@ export const getRecentlyViewed = async (req, res) => {
             populate: { path: 'user', select: 'name profileImage' }
         });
         res.json(user.recentlyViewed || []);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const getUserDashboardData = async (req, res) => {
+    try {
+        const { Booking } = await import('../models/Booking.js');
+        const userId = req.user._id;
+
+        const [user, workers, bookings, workerStats] = await Promise.all([
+            User.findById(userId).populate([
+                { path: 'savedWorkers', populate: { path: 'user', select: 'name profileImage' } },
+                { path: 'recentlyViewed', populate: { path: 'user', select: 'name profileImage' } }
+            ]),
+            Worker.find({ isVerified: true, isAvailable: true }).populate('user', 'name profileImage').limit(10),
+            Booking.find({ user: userId }).populate({
+                path: 'worker',
+                populate: { path: 'user', select: 'name profileImage' }
+            }),
+            (async () => {
+                const totalVerified = await Worker.countDocuments({ isVerified: true });
+                const available = await Worker.countDocuments({ isVerified: true, isAvailable: true });
+                const allWorkers = await Worker.find({ isVerified: true });
+                const expertiseMap = {};
+                allWorkers.forEach(w => {
+                    w.skills.forEach(skill => {
+                        expertiseMap[skill] = (expertiseMap[skill] || 0) + 1;
+                    });
+                });
+                const expertiseData = Object.entries(expertiseMap).map(([name, value]) => ({ name, value }));
+                return { totalVerified, available, busy: totalVerified - available, expertiseData };
+            })(),
+        ]);
+
+        const workerProfile = await Worker.findOne({ user: userId });
+
+        const totalSpent = bookings
+            .filter(b => b.status === 'completed')
+            .reduce((sum, b) => sum + (b.worker?.price || 0), 0);
+
+        const activeProjects = bookings.filter(b => ['pending', 'accepted'].includes(b.status)).length;
+        const completedProjects = bookings.filter(b => b.status === 'completed').length;
+
+        res.json({
+            user: {
+                name: user.name,
+                role: user.role,
+                savedWorkers: user.savedWorkers || [],
+                recentlyViewed: user.recentlyViewed || [],
+            },
+            workers,
+            bookings,
+            workerStats,
+            userStats: {
+                totalSpent,
+                activeProjects,
+                completedProjects,
+                totalProjects: bookings.length
+            },
+            workerProfile
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
