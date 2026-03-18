@@ -35,6 +35,7 @@ app.use(compression());
 const server = http.createServer(app);
 const allowedOrigins = [
     (process.env.FRONTEND_URL || '').trim(),
+    'https://find-your-painter.vercel.app', // Explicit production URL
     'http://localhost:5173',
     'http://127.0.0.1:5173'
 ].filter(Boolean);
@@ -55,15 +56,22 @@ console.log('[SOCKET_INIT] Allowing origins:', allowedOrigins);
 
 app.use(cors({
     origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl) 
+        // OR origins that match our allowed list
         if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
             callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));
+            console.warn(`[CORS] Rejected origin: ${origin}`);
+            callback(null, false); // Don't throw error, just disallow
         }
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    credentials: true
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    exposedHeaders: ['Set-Cookie']
 }));
+// Explicitly handle OPTIONS preflight
+app.options('*', cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 

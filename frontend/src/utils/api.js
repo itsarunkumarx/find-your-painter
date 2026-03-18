@@ -7,6 +7,7 @@ const cleanBaseURL = `${rawBaseURL.replace(/\/+$/, '').replace(/(\/api)+$/, '')}
 
 const api = axios.create({
     baseURL: cleanBaseURL,
+    withCredentials: true,
 });
 
 // Add a request interceptor to include the token
