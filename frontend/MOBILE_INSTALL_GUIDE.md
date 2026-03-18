@@ -333,6 +333,8 @@ Users will need to:
 - ✅ Install prompt capture + button wiring
 - ✅ Device detection + button visibility
 - ✅ Capacitor config
+- ✅ Hardware Back Button handling (Android)
+- ✅ UI touch optimizations (disable highlights)
 
 ### What Requires Manual Action
 - 📱 **Install Android Studio** — download from developer.android.com

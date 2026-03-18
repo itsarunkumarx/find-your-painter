@@ -16,7 +16,7 @@ const AuditLogs = () => {
             const { data } = await api.get('/admin/audit-logs');
             setLogs(data);
         } catch (error) {
-            console.error('Fetch audit logs failed', error);
+            if (import.meta.env.DEV) console.error('Fetch audit logs failed', error);
         } finally {
             setLoading(false);
         }

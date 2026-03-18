@@ -3,9 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import api from '../utils/api';
+import toast from 'react-hot-toast';
 import { FaCheckCircle, FaComments, FaPhone, FaVideo, FaTimes, FaUserAlt, FaMapMarkerAlt, FaPaintRoller, FaCalendarAlt } from 'react-icons/fa';
 import Chat from './Chat';
-import { useSocket } from '../context/SocketContext';
+import { useSocket } from '../hooks/useSocket';
 
 const BookingModal = ({ isOpen, onClose, worker }) => {
     const { t } = useTranslation();
@@ -38,7 +39,7 @@ const BookingModal = ({ isOpen, onClose, worker }) => {
             setIsSuccess(true);
         } catch (error) {
             console.error("Booking error:", error.response?.data || error.message);
-            alert(t('booking_failed'));
+            toast.error(t('booking_failed'));
         } finally {
             setLoading(false);
         }
@@ -46,7 +47,7 @@ const BookingModal = ({ isOpen, onClose, worker }) => {
 
     const handleGetLocation = () => {
         if (!navigator.geolocation) {
-            alert(t('geolocation_unsupported'));
+            toast.error(t('geolocation_unsupported'));
             return;
         }
 
@@ -64,7 +65,7 @@ const BookingModal = ({ isOpen, onClose, worker }) => {
                 }
             },
             (error) => {
-                alert(t('location_error'));
+                toast.error(t('location_error'));
             }
         );
     };

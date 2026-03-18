@@ -27,7 +27,7 @@ const PainterProfile = () => {
                 // Add to recently viewed
                 await api.put(`/users/recently-viewed/${id}`, {});
             } catch (error) {
-                console.error("Profile fetch error", error);
+                if (import.meta.env.DEV) console.error("Profile fetch error", error);
             } finally {
                 setLoading(false);
             }

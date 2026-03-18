@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import {
     FaUser, FaBell, FaPalette, FaHistory, FaSignOutAlt, FaShieldAlt, FaLanguage, FaVolumeUp, FaVideo, FaGamepad, FaLink, FaMobileAlt,
     FaGlobe, FaChevronRight, FaCamera, FaCheckCircle, FaPhone, FaEnvelope, FaMapMarkerAlt, FaLock
@@ -9,7 +10,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useRef, useEffect } from 'react';
-import { useSocket } from '../context/SocketContext';
+import { useSocket } from '../hooks/useSocket';
 
 const SettingsPage = () => {
     const { user, updateUser, logout } = useAuth();
@@ -54,9 +55,9 @@ const SettingsPage = () => {
         try {
             const { data } = await api.put('/users/profile', profileData);
             updateUser(data);
-            alert('Profile updated successfully');
+            toast.success('Profile updated successfully');
         } catch (error) {
-            alert(error.response?.data?.message || 'Update failed');
+            toast.error(error.response?.data?.message || 'Update failed');
         } finally {
             setLoading(false);
         }
@@ -65,7 +66,7 @@ const SettingsPage = () => {
     const handleSecurityUpdate = async (e) => {
         e.preventDefault();
         if (securityData.newPassword !== securityData.confirmPassword) {
-            alert('New passwords do not match');
+            toast.error('New passwords do not match');
             return;
         }
         setLoading(true);
@@ -73,10 +74,10 @@ const SettingsPage = () => {
             await api.put('/users/profile', {
                 password: securityData.newPassword
             });
-            alert('Password updated successfully');
+            toast.success('Password updated successfully');
             setSecurityData({ currentPassword: '', newPassword: '', confirmPassword: '' });
         } catch (error) {
-            alert(error.response?.data?.message || 'Security update failed');
+            toast.error(error.response?.data?.message || 'Security update failed');
         } finally {
             setLoading(false);
         }
@@ -97,7 +98,23 @@ const SettingsPage = () => {
         i18n.changeLanguage(lng);
     };
 
-    const { isPushSupported, isSubscribed, subscribeToPush } = useSocket();
+    const { isPushSupported, isSubscribed, isPushInitializing, subscribeToPush, unsubscribeFromPush, sendTestNotification } = useSocket();
+
+    const handlePreferenceToggle = async (itemId) => {
+        if (!user) return;
+        const currentVal = user.notificationPreferences?.[itemId] ?? (itemId === 'email');
+        try {
+            const { data } = await api.put('/users/profile', {
+                notificationPreferences: {
+                    ...user.notificationPreferences,
+                    [itemId]: !currentVal
+                }
+            });
+            updateUser(data);
+        } catch (err) {
+            if (import.meta.env.DEV) console.error('Failed to update preference:', err);
+        }
+    };
 
     const handleLogout = () => {
         logout();
@@ -354,33 +371,47 @@ const SettingsPage = () => {
                                                     <p className="text-[9px] font-bold text-[var(--text-muted)] mt-1">{item.desc}</p>
                                                 </div>
                                                 {item.id === 'push' ? (
-                                                    <div className="flex items-center justify-between p-4 bg-navy-deep/5 rounded-2xl hover:bg-navy-deep/10 transition-all">
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="p-3 bg-white/80 rounded-xl text-navy-deep/40 group-hover:text-royal-gold transition-colors">
-                                                                <FaMobileAlt size={20} />
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-4 bg-navy-deep/5 p-3 rounded-2xl">
+                                                            <div className="p-2 bg-white/80 rounded-xl text-navy-deep/40 group-hover:text-royal-gold transition-colors">
+                                                                <FaMobileAlt size={16} />
                                                             </div>
-                                                            <div>
-                                                                <p className="text-sm font-bold text-navy-deep">Offline Notifications</p>
-                                                                <p className="text-[10px] text-navy-deep/50">Get alerts even when app is closed</p>
+                                                            <div className="hidden sm:block">
+                                                                <p className="text-[10px] font-black text-navy-deep uppercase tracking-tight">App Signal</p>
                                                             </div>
                                                         </div>
                                                         {isPushSupported ? (
-                                                            <button
-                                                                onClick={subscribeToPush}
-                                                                disabled={isSubscribed}
-                                                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isSubscribed ? 'bg-green-500/10 text-green-500 cursor-default' : 'bg-navy-deep text-royal-gold hover:scale-105'
-                                                                    }`}
+                                                              <button
+                                                                onClick={isSubscribed ? unsubscribeFromPush : subscribeToPush}
+                                                                disabled={isPushInitializing}
+                                                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isSubscribed 
+                                                                    ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20 shadow-sm border border-red-500/20' 
+                                                                    : 'bg-navy-deep text-royal-gold hover:scale-105 shadow-lg'
+                                                                    } ${isPushInitializing ? 'opacity-50 cursor-wait' : ''}`}
                                                             >
-                                                                {isSubscribed ? 'Enabled' : 'Enable'}
+                                                                {isPushInitializing ? (isSubscribed ? 'Deactivating...' : 'Initializing...') : isSubscribed ? 'Disable' : 'Enable'}
                                                             </button>
                                                         ) : (
-                                                            <span className="text-[9px] font-bold text-red-500 bg-red-50 px-3 py-1 rounded-full">Not Supported</span>
+                                                            <span className="text-[9px] font-bold text-red-500 bg-red-50 px-3 py-1 rounded-full border border-red-100 uppercase tracking-widest">Not Supported</span>
+                                                        )}
+                                                        {isSubscribed && (
+                                                            <button
+                                                                onClick={sendTestNotification}
+                                                                className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-royal-gold text-navy-deep hover:scale-105 transition-all shadow-lg"
+                                                            >
+                                                                Test
+                                                            </button>
                                                         )}
                                                     </div>
                                                 ) : (
-                                                    <div className="w-12 h-6 bg-[var(--bg-base)] rounded-full relative cursor-not-allowed opacity-50">
-                                                        <div className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-md" />
-                                                    </div>
+                                                    <button
+                                                        onClick={() => handlePreferenceToggle(item.id)}
+                                                        className={`w-14 h-7 rounded-full relative transition-all duration-500 shadow-inner ${user?.notificationPreferences?.[item.id] ? 'bg-navy-deep' : 'bg-slate-200'}`}
+                                                    >
+                                                        <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-lg transition-all duration-500 flex items-center justify-center ${user?.notificationPreferences?.[item.id] ? 'left-8 bg-royal-gold' : 'left-1'}`}>
+                                                            {user?.notificationPreferences?.[item.id] && <FaCheckCircle className="text-navy-deep text-[10px]" />}
+                                                        </div>
+                                                    </button>
                                                 )}
                                             </div>
                                         ))}

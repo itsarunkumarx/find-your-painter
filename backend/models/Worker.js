@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const workerSchema = new mongoose.Schema({
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true, index: true },
 
     // Professional Details
     skills: [{ type: String, required: true }],

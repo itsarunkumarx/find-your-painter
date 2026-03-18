@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../utils/api';
+import fastApi from '../utils/fastApi';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FaCalendarAlt, FaClock, FaCheckCircle, FaTimesCircle, FaComments,
@@ -7,8 +8,9 @@ import {
 } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import Chat from '../components/Chat';
-import { useSocket } from '../context/SocketContext';
+import { useSocket } from '../hooks/useSocket';
 import { FaRupeeSign } from 'react-icons/fa';
 
 const statusConfig = {
@@ -36,26 +38,33 @@ const MyBookings = () => {
     const { startCall } = useSocket();
 
     useEffect(() => {
-        const fetchBookings = async () => {
-            try {
-                const { data } = await api.get('/bookings/my-bookings');
-                setBookings(data);
-            } catch (error) {
-                console.error("Fetch bookings error", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+    const fetchBookings = async (showLoading = true) => {
+        if (showLoading && !bookings.length) setLoading(true);
+        try {
+            await fastApi.getWithCache('/bookings/my-bookings', (data, isCached) => {
+                setBookings(data || []);
+                if (isCached && loading) setLoading(false);
+            }, { forceRefresh: !showLoading });
+        } catch (error) {
+            if (import.meta.env.DEV) console.error("Fetch bookings error", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         fetchBookings();
+    }, []);
     }, []);
 
     const cancelBooking = async (id) => {
         if (!window.confirm(t('cancel_confirm') || 'Are you sure you want to cancel this booking?')) return;
         try {
             await api.put(`/bookings/${id}/status`, { status: 'cancelled' });
+            toast.success('Mission aborted successfully');
             setBookings(prev => prev.map(b => b._id === id ? { ...b, status: 'cancelled' } : b));
         } catch (error) {
-            alert(error.response?.data?.message || t('cancel_failed'));
+            toast.error(error.response?.data?.message || t('cancel_failed'));
         }
     };
 

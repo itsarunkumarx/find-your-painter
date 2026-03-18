@@ -13,12 +13,16 @@ export const updateProfile = async (req, res) => {
             user.address = req.body.address || user.address;
             user.customRingtone = req.body.customRingtone || user.customRingtone;
             user.customOutgoingTone = req.body.customOutgoingTone || user.customOutgoingTone;
+            if (req.body.notificationPreferences) {
+                user.notificationPreferences = { ...user.notificationPreferences, ...req.body.notificationPreferences };
+            }
             if (req.body.password) user.password = req.body.password;
             const updatedUser = await user.save();
             res.json({
                 _id: updatedUser._id, name: updatedUser.name, email: updatedUser.email,
                 role: updatedUser.role, phoneNumber: updatedUser.phoneNumber,
                 profileImage: updatedUser.profileImage, uiPreferences: updatedUser.uiPreferences,
+                notificationPreferences: updatedUser.notificationPreferences,
                 address: updatedUser.address, customRingtone: updatedUser.customRingtone,
                 customOutgoingTone: updatedUser.customOutgoingTone
             });

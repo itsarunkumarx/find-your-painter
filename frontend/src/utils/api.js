@@ -1,4 +1,5 @@
 import axios from 'axios';
+import safeStorage from './safeStorage';
 
 const rawBaseURL = import.meta.env.VITE_API_URL || '';
 // Aggressively remove any trailing slashes and any number of /api suffixes, then add exactly one.
@@ -10,7 +11,7 @@ const api = axios.create({
 
 // Add a request interceptor to include the token
 api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
+    const token = safeStorage.getItem('token');
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }

@@ -27,7 +27,9 @@ const AdminSupportPage = () => {
         try {
             const { data } = await api.get('/support');
             setTickets(data);
-        } catch (e) { console.error(e); } finally { setLoading(false); }
+        } catch (e) { 
+            if (import.meta.env.DEV) console.error(e); 
+        } finally { setLoading(false); }
     };
 
     useEffect(() => { fetchTickets(); }, []);
@@ -43,7 +45,9 @@ const AdminSupportPage = () => {
             const { data } = await api.put(`/support/${id}/status`, { status });
             setTickets(prev => prev.map(t => t._id === id ? { ...t, status: data.status } : t));
             if (selected?._id === id) setSelected(prev => ({ ...prev, status: data.status }));
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            if (import.meta.env.DEV) console.error(e); 
+        }
     };
 
     const sendReply = async () => {
@@ -53,7 +57,9 @@ const AdminSupportPage = () => {
             setReply('');
             setTickets(prev => prev.map(t => t._id === selected._id ? data : t));
             setSelected(data);
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            if (import.meta.env.DEV) console.error(e); 
+        }
     };
 
     const counts = { open: tickets.filter(t => t.status === 'open').length, 'in-review': tickets.filter(t => t.status === 'in-review').length, resolved: tickets.filter(t => t.status === 'resolved').length };

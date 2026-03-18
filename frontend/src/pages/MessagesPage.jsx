@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
-import { useSocket } from '../context/SocketContext';
+import { useSocket } from '../hooks/useSocket';
 import { useTranslation } from 'react-i18next';
 import { FaInbox, FaComments, FaSearch, FaCircle, FaPaintBrush, FaUserTie, FaCheck, FaCheckDouble } from 'react-icons/fa';
 import { useLocation } from 'react-router-dom';
@@ -32,7 +32,7 @@ const MessagesPage = () => {
                 if (target) setSelectedChat(target.booking);
             }
         } catch (error) {
-            console.error('Fetch conversations failed', error);
+            if (import.meta.env.DEV) console.error('Fetch conversations failed', error);
         } finally {
             setLoading(false);
         }
@@ -158,7 +158,7 @@ const MessagesPage = () => {
                             ) : filteredConversations.length > 0 ? (
                                 filteredConversations.map((conv, i) => {
                                     const otherUser = getOtherUser(conv);
-                                    const isOnline = onlineUsers.includes(otherUser?._id);
+                                    const isOnline = onlineUsers.some(uid => uid.toString() === otherUser?._id?.toString());
                                     const isSelected = selectedChat?._id === conv.booking._id;
                                     const hasUnread = conv.unreadCount > 0;
 

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaStar, FaQuoteLeft, FaPlus, FaCheck, FaTimes } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import api from '../utils/api';
+import toast from 'react-hot-toast';
 
 const ReviewsPage = () => {
     const { t } = useTranslation();
@@ -25,7 +26,7 @@ const ReviewsPage = () => {
             const { data: reviewData } = await api.get('/reviews/my-reviews');
             setReviews(reviewData);
         } catch (error) {
-            console.error("Fetch reviews data error", error);
+            if (import.meta.env.DEV) console.error("Fetch reviews data error", error);
         } finally {
             setLoading(false);
         }
@@ -45,13 +46,13 @@ const ReviewsPage = () => {
                 comment
             };
             await api.post('/reviews', reviewData);
-            alert(t('review_success'));
+            toast.success(t('review_success'));
             setShowForm(false);
             setRating(5);
             setComment('');
             fetchData();
         } catch (error) {
-            alert(error.response?.data?.message || t('submission_failed'));
+            toast.error(error.response?.data?.message || t('submission_failed'));
         }
     };
 

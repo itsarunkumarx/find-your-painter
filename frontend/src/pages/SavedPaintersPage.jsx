@@ -17,7 +17,7 @@ const SavedPaintersPage = () => {
                 const { data } = await api.get('/users/saved-painters');
                 setSaved(data);
             } catch (e) { 
-                console.error(e); 
+                if (import.meta.env.DEV) console.error(e); 
             } finally { 
                 setLoading(false); 
             }
@@ -30,7 +30,7 @@ const SavedPaintersPage = () => {
             await api.put(`/users/save-painter/${workerId}`, {});
             setSaved(prev => prev.filter(w => w._id !== workerId));
         } catch (e) {
-            console.error(e);
+            if (import.meta.env.DEV) console.error(e);
         }
     };
 

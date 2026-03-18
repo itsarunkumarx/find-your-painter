@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaPaintBrush, FaUser, FaSignOutAlt, FaBars, FaTimes, FaTachometerAlt } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import ThemeToggle from './ThemeToggle';
+import fastApi from '../utils/fastApi';
 
 const Navbar = () => {
     const { t } = useTranslation();
@@ -47,6 +48,7 @@ const Navbar = () => {
                         <>
                             <Link
                                 to={getDashboardPath()}
+                                onMouseEnter={() => fastApi.prefetch(getDashboardPath() === '/user-dashboard' ? '/bookings/user' : '/bookings/worker')}
                                 className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-[var(--text-muted)] hover:text-royal-gold transition-colors duration-300"
                             >
                                 <FaTachometerAlt className="text-royal-gold" />
@@ -55,6 +57,7 @@ const Navbar = () => {
 
                             <Link
                                 to="/profile-settings"
+                                onMouseEnter={() => fastApi.prefetch('/auth/me')}
                                 className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-[var(--text-muted)] hover:text-royal-gold transition-colors duration-300"
                             >
                                 <FaUser className="text-royal-gold" />

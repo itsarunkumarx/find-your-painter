@@ -1,8 +1,8 @@
 import { Suspense, lazy } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import DashboardLayout from './components/DashboardLayout';
-import IncomingCallModal from './components/IncomingCallModal';
+// Removed duplicate IncomingCallModal import
 import Navbar from './components/Navbar';
 import { WorkerProvider } from './context/WorkerContext';
 import { Toaster } from 'react-hot-toast';
@@ -59,17 +59,58 @@ const DASHBOARD_ROUTES = [
   '/my-portfolio', '/earnings', '/admin-analytics', '/admin-support', '/payment',
   '/help', '/project', '/audit-logs', '/admin-users', '/admin-workers',
   '/admin-notifications', '/raise-complaint', '/worker-profile', '/admin-profile', 
-  '/audio-protocols', '/admin-settings', '/call-history'
+  '/audio-protocols', '/admin-settings', '/call-history',
+  // Space-delimited aliases (to prevent white-screen on malformed/translated links)
+  '/call history', '/profile settings', '/my bookings', '/worker jobs', '/audit logs', '/worker verification'
 ];
+
+import { useEffect } from 'react';
+import { App as CapApp } from '@capacitor/app';
 
 const App = () => {
   const location = useLocation();
-  const isDashboard = DASHBOARD_ROUTES.some(r => location.pathname.startsWith(r));
+  const navigate = useNavigate();
+  
+  // Resilient dashboard check: normalize path (decode %20 and handle space/hyphen mismatches)
+  const normalizedPath = decodeURIComponent(location.pathname).toLowerCase();
+  const isDashboard = DASHBOARD_ROUTES.some(r => normalizedPath.startsWith(r.toLowerCase()));
+
+  useEffect(() => {
+    let listener;
+    
+    const setupBackButton = async () => {
+      try {
+        // Only attempt to add listener if CapApp and addListener are available
+        if (CapApp && typeof CapApp.addListener === 'function') {
+          listener = await CapApp.addListener('backButton', ({ canGoBack }) => {
+            const exitRoutes = ['/', '/roles', '/login/user', '/login/worker', '/login/admin'];
+            if (exitRoutes.includes(window.location.pathname)) {
+              CapApp.exitApp();
+            } else {
+              window.history.back();
+            }
+          });
+        }
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          console.warn('Capacitor App listener could not be established:', err);
+        }
+      }
+    };
+
+    setupBackButton();
+
+    return () => {
+      if (listener && typeof listener.remove === 'function') {
+        listener.remove();
+      }
+    };
+  }, []); // Only run once on mount
 
   return (
     <>
       <Toaster position="top-center" reverseOrder={false} />
-      <IncomingCallModal />
+      {/* Removed duplicate IncomingCallModal — handled by SocketContext */}
       <div className="flex min-h-screen">
         {!isDashboard && <Navbar />}
         <div className={`flex-1 ${!isDashboard ? 'pt-20' : ''}`}>
@@ -101,7 +142,9 @@ const App = () => {
                 <Route path="/help" element={<HelpPage />} />
                 <Route path="/messages" element={<MessagesPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
+                {/* Support both hyphen and space for call history */}
                 <Route path="/call-history" element={<CallHistoryPage />} />
+                <Route path="/call history" element={<CallHistoryPage />} />
               </Route>
 
               {/* Worker Space */}

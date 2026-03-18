@@ -27,7 +27,7 @@ const AdminSettings = () => {
                     setSettings(prev => ({ ...prev, ...data }));
                 }
             } catch (error) {
-                console.error('Fetch settings failed', error);
+                if (import.meta.env.DEV) console.error('Fetch settings failed', error);
             } finally {
                 setLoading(false);
             }
@@ -41,7 +41,7 @@ const AdminSettings = () => {
             await api.put('/admin/settings', { settings });
             toast.success(t('settings_saved_success') || 'Platform settings updated successfully');
         } catch (error) {
-            console.error('Save settings failed', error);
+            if (import.meta.env.DEV) console.error('Save settings failed', error);
             toast.error(t('settings_save_error') || 'Failed to update settings');
         } finally {
             setSaving(false);

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../utils/api';
+import fastApi from '../utils/fastApi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaSearch, FaUserSlash, FaUserCheck, FaPlus, FaCheck, FaTimes, FaMapMarkerAlt, FaToolbox, FaRupeeSign, FaShieldAlt, FaIdCard, FaImages, FaUserTimes, FaTrash } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
@@ -24,15 +25,18 @@ const AdminWorkerManagement = () => {
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     const fetchWorkers = async (showLoading = true) => {
-        if (showLoading) setLoading(true);
+        if (showLoading && workers.length === 0) setLoading(true);
         else setIsRefreshing(true);
         try {
-            const { data } = await api.get('/admin/workers');
-            setWorkers(data);
+            // SWR Integration: Instant delivery from cache
+            await fastApi.getWithCache('/admin/workers', (data) => {
+                setWorkers(data || []);
+                setLoading(false);
+            }, { forceRefresh: !showLoading });
         } catch (error) {
-            console.error('Fetch workers failed', error);
-        } finally {
+            if (import.meta.env.DEV) console.error('Fetch workers failed', error);
             setLoading(false);
+        } finally {
             setIsRefreshing(false);
         }
     };
@@ -112,7 +116,7 @@ const AdminWorkerManagement = () => {
             await api.put(`/admin/workers/${workerId}/verify`, { status });
             fetchWorkers();
         } catch (error) {
-            console.error('Verify worker failed', error);
+            if (import.meta.env.DEV) console.error('Verify worker failed', error);
         }
     };
 
@@ -129,7 +133,7 @@ const AdminWorkerManagement = () => {
             setNewWorker({ name: '', email: '', password: '', skills: '', experience: '', location: '', price: '', bio: '' });
             fetchWorkers();
         } catch (error) {
-            alert(error.response?.data?.message || 'Failed to add worker');
+            toast.error(error.response?.data?.message || 'Failed to add worker');
         }
     };
 

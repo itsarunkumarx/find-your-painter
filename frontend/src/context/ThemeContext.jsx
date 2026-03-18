@@ -1,13 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import safeStorage from '../utils/safeStorage';
 
 const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
-    const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+    const [theme, setTheme] = useState(safeStorage.getItem('theme') || 'light');
 
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem('theme', theme);
+        safeStorage.setItem('theme', theme);
     }, [theme]);
 
     const toggleTheme = () => {
@@ -24,7 +25,9 @@ export const ThemeProvider = ({ children }) => {
 export const useTheme = () => {
     const context = useContext(ThemeContext);
     if (!context) {
-        console.warn('useTheme: ThemeContext not available. Make sure component is wrapped in ThemeProvider.');
+        if (import.meta.env.DEV) {
+            console.warn('useTheme: ThemeContext not available. Make sure component is wrapped in ThemeProvider.');
+        }
         return { theme: 'light', toggleTheme: () => {}, setTheme: () => {} };
     }
     return context;

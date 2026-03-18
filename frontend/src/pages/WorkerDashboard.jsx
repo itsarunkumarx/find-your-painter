@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
 import { useTranslation } from 'react-i18next';
-import { useSocket } from '../context/SocketContext';
+import toast from 'react-hot-toast';
+import { useSocket } from '../hooks/useSocket';
 import {
     FaInbox, FaCheckCircle, FaClock, FaChartLine, FaStar,
     FaUserEdit, FaCheck, FaTimes, FaMapMarkerAlt, FaCalendarAlt,
@@ -17,7 +18,7 @@ import {
 import Chat from '../components/Chat';
 import { useWorker } from '../hooks/useWorker';
 
-const StatCard = ({ icon: Icon, label, value, color, delay }) => (
+const StatCard = memo(({ icon: Icon, label, value, color, delay }) => (
     <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -30,7 +31,137 @@ const StatCard = ({ icon: Icon, label, value, color, delay }) => (
         <p className="text-[var(--text-muted)] text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em]">{label}</p>
         <h3 className="text-2xl sm:text-3xl font-black text-[var(--text-main)] mt-1 leading-none">{value}</h3>
     </motion.div>
-);
+));
+
+const BookingItem = memo(({ booking, i, activeTab, t, startCall, setSelectedChat, handleUpdateStatus, handleConfirmPayment }) => (
+    <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 20 }}
+        transition={{ delay: i * 0.05 }}
+        className="group p-5 sm:p-6 bg-[var(--bg-highlight)]/20 rounded-[2rem] sm:rounded-[2.5rem] border border-transparent hover:border-royal-gold/20 hover:bg-[var(--bg-base)] transition-all flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6 shadow-sm hover:shadow-xl"
+    >
+        <div className="flex items-center gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[var(--bg-base)] overflow-hidden border border-royal-gold/10 shadow-sm flex-shrink-0">
+                <img src={booking.user?.profileImage || "/assets/premium-avatar.png"} alt={booking.user?.name} className="w-full h-full object-cover" />
+            </div>
+            <div className="min-w-0 flex-1">
+                <h4 className="font-black text-[var(--text-main)] text-sm sm:text-base group-hover:text-royal-gold transition-colors truncate">{booking.user?.name}</h4>
+                <div className="flex gap-2 sm:gap-3 mt-1 flex-wrap">
+                    {booking.user?.email && (
+                        <span className="flex items-center gap-1 text-[8px] sm:text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest truncate">
+                            <FaEnvelope className="text-royal-gold text-[7px]" /> {booking.user.email}
+                        </span>
+                    )}
+                    <span className="flex items-center gap-1 text-[8px] sm:text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest">
+                        <FaCalendarAlt className="text-royal-gold text-[7px]" /> {new Date(booking.date).toLocaleDateString()}
+                    </span>
+                    {booking.address && (
+                        <span className="flex items-center gap-1 text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest">
+                            <FaMapMarkerAlt className="text-royal-gold text-[8px]" /> {booking.address}
+                        </span>
+                    )}
+                </div>
+                {booking.description && (
+                    <p className="text-[10px] text-[var(--text-muted)] mt-1 italic max-w-xs truncate">"{booking.description}"</p>
+                )}
+            </div>
+        </div>
+
+        <div className="flex gap-2 flex-wrap items-center">
+            <div className="flex gap-2">
+                <button
+                    onClick={() => startCall(booking.user, 'voice')}
+                    title="Voice Call"
+                    className="flex items-center gap-1.5 px-3 py-2.5 bg-[var(--bg-base)] border border-royal-gold/20 text-royal-gold rounded-xl text-[8px] font-black uppercase tracking-widest hover:bg-royal-gold/10 transition-all shadow-sm"
+                >
+                    <FaPhone size={8} /> {t('call_btn')}
+                </button>
+                <button
+                    onClick={() => startCall(booking.user, 'video')}
+                    title="Video Call"
+                    className="flex items-center gap-1.5 px-3 py-2.5 bg-[var(--bg-base)] border border-royal-gold/20 text-royal-gold rounded-xl text-[8px] font-black uppercase tracking-widest hover:bg-royal-gold/10 transition-all shadow-sm"
+                >
+                    <FaVideo size={8} /> {t('video_btn')}
+                </button>
+            </div>
+
+            {activeTab === 'requests' && (
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setSelectedChat(booking)}
+                        className="flex items-center justify-center w-10 h-10 bg-[var(--bg-base)] border border-royal-gold/20 text-royal-gold rounded-xl hover:bg-royal-gold/5 transition-all shadow-sm"
+                    >
+                        <FaComments size={14} />
+                    </button>
+                    <button
+                        onClick={() => handleUpdateStatus(booking._id, 'accepted', 'not_started')}
+                        className="px-4 py-2.5 bg-[var(--text-main)] text-royal-gold rounded-xl text-[9px] font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center gap-2"
+                    >
+                        <FaCheck size={10} /> {t('accept_mission_btn')}
+                    </button>
+                    <button
+                        onClick={() => handleUpdateStatus(booking._id, 'rejected')}
+                        className="px-4 py-2.5 bg-[var(--bg-base)] text-red-400 border border-red-400/30 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all shadow-sm flex items-center gap-2"
+                    >
+                        <FaTimes size={10} />
+                    </button>
+                </div>
+            )}
+
+            {activeTab === 'active' && (
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setSelectedChat(booking)}
+                        className="flex items-center justify-center w-10 h-10 bg-[var(--bg-base)] border border-royal-gold/20 text-royal-gold rounded-xl hover:bg-royal-gold/5 transition-all shadow-sm"
+                    >
+                        <FaComments size={14} />
+                    </button>
+                    {booking.subStatus === 'not_started' && (
+                        <button
+                            onClick={() => handleUpdateStatus(booking._id, 'accepted', 'started')}
+                            className="px-5 py-2.5 bg-[var(--text-main)] text-royal-gold rounded-xl text-[9px] font-black uppercase tracking-widest hover:brightness-110 flex items-center gap-2"
+                        >
+                            <FaPlay size={9} /> {t('initialize_mission_btn')}
+                        </button>
+                    )}
+                    {booking.subStatus === 'started' && (
+                        <button
+                            onClick={() => handleUpdateStatus(booking._id, 'accepted', 'in_progress')}
+                            className="px-5 py-2.5 bg-yellow-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:brightness-110 shadow-lg shadow-yellow-500/20 flex items-center gap-2"
+                        >
+                            <FaPause size={9} /> {t('end_prep_btn')}
+                        </button>
+                    )}
+                    {booking.subStatus === 'in_progress' && (
+                        <button
+                            onClick={() => handleUpdateStatus(booking._id, 'completed', 'completed')}
+                            className="px-5 py-2.5 bg-green-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-green-600 flex items-center gap-2"
+                        >
+                            <FaFlagCheckered size={9} /> {t('finish_mission_btn')}
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {activeTab === 'completed' && (
+                <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-2.5 px-6 py-2.5 bg-green-500/10 text-green-500 rounded-xl text-[9px] font-black uppercase tracking-widest border border-green-500/20 shadow-sm">
+                        <FaCheck /> {t('archived_status')}
+                    </span>
+                    {booking.paymentStatus === 'post_paid_pending' && (
+                        <button
+                            onClick={() => handleConfirmPayment(booking._id)}
+                            className="px-6 py-3 bg-green-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-green-600 transition-all shadow-lg flex items-center gap-2"
+                        >
+                            <FaCheckCircle /> {t('confirm_cash_btn')}
+                        </button>
+                    )}
+                </div>
+            )}
+        </div>
+    </motion.div>
+));
 
 const WorkerDashboard = () => {
     const { user, logout } = useAuth();
@@ -58,7 +189,7 @@ const WorkerDashboard = () => {
     const handleToggleAvailability = async () => {
         const result = await toggleAvailability();
         if (!result.success) {
-            alert(result.message);
+            toast.error(result.message);
         }
     };
 
@@ -66,14 +197,14 @@ const WorkerDashboard = () => {
         if (!window.confirm("Confirm you received the full payment in cash?")) return;
         const result = await confirmPayment(id);
         if (!result.success) {
-            alert(result.message);
+            toast.error(result.message);
         }
     };
 
     const handleUpdateStatus = async (id, status, subStatus = null) => {
         const result = await updateBookingStatus(id, status, subStatus);
         if (!result.success) {
-            alert(result.message);
+            toast.error(result.message);
         }
     };
 
@@ -154,135 +285,17 @@ const WorkerDashboard = () => {
                                 ) : (
                                     <div className="space-y-5">
                                         {filteredBookings.map((booking, i) => (
-                                            <motion.div
+                                            <BookingItem
                                                 key={booking._id}
-                                                initial={{ opacity: 0, x: -20 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                exit={{ opacity: 0, x: 20 }}
-                                                transition={{ delay: i * 0.05 }}
-                                                className="group p-5 sm:p-6 bg-[var(--bg-highlight)]/20 rounded-[2rem] sm:rounded-[2.5rem] border border-transparent hover:border-royal-gold/20 hover:bg-[var(--bg-base)] transition-all flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6 shadow-sm hover:shadow-xl"
-                                            >
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[var(--bg-base)] overflow-hidden border border-royal-gold/10 shadow-sm flex-shrink-0">
-                                                        <img src={booking.user?.profileImage || "/assets/premium-avatar.png"} alt={booking.user?.name} className="w-full h-full object-cover" />
-                                                    </div>
-                                                    <div className="min-w-0 flex-1">
-                                                        <h4 className="font-black text-[var(--text-main)] text-sm sm:text-base group-hover:text-royal-gold transition-colors truncate">{booking.user?.name}</h4>
-                                                        <div className="flex gap-2 sm:gap-3 mt-1 flex-wrap">
-                                                            {booking.user?.email && (
-                                                                <span className="flex items-center gap-1 text-[8px] sm:text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest truncate">
-                                                                    <FaEnvelope className="text-royal-gold text-[7px]" /> {booking.user.email}
-                                                                </span>
-                                                            )}
-                                                            <span className="flex items-center gap-1 text-[8px] sm:text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest">
-                                                                <FaCalendarAlt className="text-royal-gold text-[7px]" /> {new Date(booking.date).toLocaleDateString()}
-                                                            </span>
-                                                            {booking.address && (
-                                                                <span className="flex items-center gap-1 text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest">
-                                                                    <FaMapMarkerAlt className="text-royal-gold text-[8px]" /> {booking.address}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        {booking.description && (
-                                                            <p className="text-[10px] text-[var(--text-muted)] mt-1 italic max-w-xs truncate">"{booking.description}"</p>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex gap-2 flex-wrap items-center">
-                                                    {/* Call Buttons */}
-                                                    <div className="flex gap-2">
-                                                        <button
-                                                            onClick={() => startCall(booking.user, 'voice')}
-                                                            title="Voice Call"
-                                                            className="flex items-center gap-1.5 px-3 py-2.5 bg-[var(--bg-base)] border border-royal-gold/20 text-royal-gold rounded-xl text-[8px] font-black uppercase tracking-widest hover:bg-royal-gold/10 transition-all shadow-sm"
-                                                        >
-                                                            <FaPhone size={8} /> {t('call_btn')}
-                                                        </button>
-                                                        <button
-                                                            onClick={() => startCall(booking.user, 'video')}
-                                                            title="Video Call"
-                                                            className="flex items-center gap-1.5 px-3 py-2.5 bg-[var(--bg-base)] border border-royal-gold/20 text-royal-gold rounded-xl text-[8px] font-black uppercase tracking-widest hover:bg-royal-gold/10 transition-all shadow-sm"
-                                                        >
-                                                            <FaVideo size={8} /> {t('video_btn')}
-                                                        </button>
-                                                    </div>
-
-                                                    {activeTab === 'requests' && (
-                                                        <div className="flex gap-2">
-                                                            <button
-                                                                onClick={() => setSelectedChat(booking)}
-                                                                className="flex items-center justify-center w-10 h-10 bg-[var(--bg-base)] border border-royal-gold/20 text-royal-gold rounded-xl hover:bg-royal-gold/5 transition-all shadow-sm"
-                                                            >
-                                                                <FaComments size={14} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleUpdateStatus(booking._id, 'accepted', 'not_started')}
-                                                                className="px-4 py-2.5 bg-[var(--text-main)] text-royal-gold rounded-xl text-[9px] font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center gap-2"
-                                                            >
-                                                                <FaCheck size={10} /> {t('accept_mission_btn')}
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleUpdateStatus(booking._id, 'rejected')}
-                                                                className="px-4 py-2.5 bg-[var(--bg-base)] text-red-400 border border-red-400/30 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all shadow-sm flex items-center gap-2"
-                                                            >
-                                                                <FaTimes size={10} />
-                                                            </button>
-                                                        </div>
-                                                    )}
-
-                                                    {activeTab === 'active' && (
-                                                        <div className="flex items-center gap-2">
-                                                            <button
-                                                                onClick={() => setSelectedChat(booking)}
-                                                                className="flex items-center justify-center w-10 h-10 bg-[var(--bg-base)] border border-royal-gold/20 text-royal-gold rounded-xl hover:bg-royal-gold/5 transition-all shadow-sm"
-                                                            >
-                                                                <FaComments size={14} />
-                                                            </button>
-                                                            {booking.subStatus === 'not_started' && (
-                                                                <button
-                                                                    onClick={() => handleUpdateStatus(booking._id, 'accepted', 'started')}
-                                                                    className="px-5 py-2.5 bg-[var(--text-main)] text-royal-gold rounded-xl text-[9px] font-black uppercase tracking-widest hover:brightness-110 flex items-center gap-2"
-                                                                >
-                                                                    <FaPlay size={9} /> {t('initialize_mission_btn')}
-                                                                </button>
-                                                            )}
-                                                            {booking.subStatus === 'started' && (
-                                                                <button
-                                                                    onClick={() => handleUpdateStatus(booking._id, 'accepted', 'in_progress')}
-                                                                    className="px-5 py-2.5 bg-yellow-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:brightness-110 shadow-lg shadow-yellow-500/20 flex items-center gap-2"
-                                                                >
-                                                                    <FaPause size={9} /> {t('end_prep_btn')}
-                                                                </button>
-                                                            )}
-                                                            {booking.subStatus === 'in_progress' && (
-                                                                <button
-                                                                    onClick={() => handleUpdateStatus(booking._id, 'completed', 'completed')}
-                                                                    className="px-5 py-2.5 bg-green-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-green-600 flex items-center gap-2"
-                                                                >
-                                                                    <FaFlagCheckered size={9} /> {t('finish_mission_btn')}
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    )}
-
-                                                    {activeTab === 'completed' && (
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="flex items-center gap-2.5 px-6 py-2.5 bg-green-500/10 text-green-500 rounded-xl text-[9px] font-black uppercase tracking-widest border border-green-500/20 shadow-sm">
-                                                                <FaCheck /> {t('archived_status')}
-                                                            </span>
-                                                            {booking.paymentStatus === 'post_paid_pending' && (
-                                                                <button
-                                                                    onClick={() => handleConfirmPayment(booking._id)}
-                                                                    className="px-6 py-3 bg-green-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-green-600 transition-all shadow-lg flex items-center gap-2"
-                                                                >
-                                                                    <FaCheckCircle /> {t('confirm_cash_btn')}
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </motion.div>
+                                                booking={booking}
+                                                i={i}
+                                                activeTab={activeTab}
+                                                t={t}
+                                                startCall={startCall}
+                                                setSelectedChat={setSelectedChat}
+                                                handleUpdateStatus={handleUpdateStatus}
+                                                handleConfirmPayment={handleConfirmPayment}
+                                            />
                                         ))}
                                         {filteredBookings.length === 0 && (
                                             <div className="py-20 text-center flex flex-col items-center">
@@ -327,9 +340,9 @@ const WorkerDashboard = () => {
                                                                                 await api.put('/users/profile', 
                                                                                     { customRingtone: reader.result }
                                                                                 );
-                                                                                alert('Custom ringtone updated successfully!');
+                                                                                toast.success('Custom ringtone updated successfully!');
                                                                                 window.location.reload();
-                                                                            } catch (err) { alert('Upload failed'); }
+                                                                            } catch (err) { toast.error('Upload failed'); }
                                                                         };
                                                                         reader.readAsDataURL(file);
                                                                     }}
@@ -443,7 +456,7 @@ const WorkerDashboard = () => {
                         </div>
 
                         <div className="h-40 sm:h-52 w-full">
-                            <ResponsiveContainer width="100%" height="100%" minHeight={160}>
+                            <ResponsiveContainer width="100%" height="100%" minHeight={160} minWidth={0}>
                                 <AreaChart data={earnings?.monthlyChart?.length > 0 ? earnings.monthlyChart : chartData}>
                                     <defs>
                                         <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -505,8 +518,8 @@ const WorkerDashboard = () => {
 
                         <div className="w-full space-y-3 mb-6">
                             <div className="flex gap-2 flex-wrap justify-center">
-                                {worker?.skills?.map(skill => (
-                                    <span key={skill} className="px-3 sm:px-5 py-1.5 sm:py-2 bg-[var(--bg-highlight)]/50 text-[var(--text-muted)] text-[7px] sm:text-[8px] font-black uppercase tracking-widest rounded-lg sm:rounded-xl border border-royal-gold/5">{skill}</span>
+                                {worker?.skills?.map((skill, idx) => (
+                                    <span key={skill || idx} className="px-3 sm:px-5 py-1.5 sm:py-2 bg-[var(--bg-highlight)]/50 text-[var(--text-muted)] text-[7px] sm:text-[8px] font-black uppercase tracking-widest rounded-lg sm:rounded-xl border border-royal-gold/5">{skill}</span>
                                 ))}
                             </div>
                         </div>

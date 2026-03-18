@@ -50,7 +50,8 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
       },
       devOptions: {
-        enabled: false, // CRITICAL: SW must be OFF in dev — causes duplicate React from stale cache
+        enabled: true, // Allow testing push in dev
+        type: 'module'
       }
     })
   ],
@@ -60,11 +61,14 @@ export default defineConfig({
       output: {
         manualChunks: (id) => {
           if (id.includes('node_modules')) {
+            if (id.includes('react-icons')) {
+              return 'vendor-icons';
+            }
+            if (id.includes('framer-motion')) {
+              return 'vendor-framer';
+            }
             if (id.includes('react') || id.includes('react-router-dom') || id.includes('react-dom')) {
               return 'vendor-react';
-            }
-            if (id.includes('react-icons') || id.includes('framer-motion')) {
-              return 'vendor-ui';
             }
             if (id.includes('recharts') || id.includes('axios') || id.includes('i18next')) {
               return 'vendor-utils';
@@ -82,6 +86,11 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:5000',
       '/uploads': 'http://localhost:5000',
+      '/socket.io': {
+        target: 'http://localhost:5000',
+        ws: true,
+        changeOrigin: true,
+      },
     },
   },
 })

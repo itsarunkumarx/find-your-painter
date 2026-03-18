@@ -3,13 +3,12 @@ import api from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaBell, FaCheckCircle, FaClock, FaExclamationTriangle, FaTrash, FaCheckDouble } from 'react-icons/fa';
 import { formatDistanceToNow } from 'date-fns';
-import { io } from 'socket.io-client';
-import { useAuth } from '../hooks/useAuth';
+import { useSocket } from '../hooks/useSocket';
 
-import { useTranslation } from 'react-i18next';
 const NotificationsPage = () => {
     const { t } = useTranslation();
     if (!t) return null;
+    const { socket } = useSocket();
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -17,7 +16,9 @@ const NotificationsPage = () => {
         try {
             const { data } = await api.get('/notifications');
             setNotifications(data);
-        } catch (e) { console.error(e); } finally { setLoading(false); }
+        } catch (e) { 
+            if (import.meta.env.DEV) console.error(e); 
+        } finally { setLoading(false); }
     };
 
     const { user } = useAuth();
@@ -25,15 +26,20 @@ const NotificationsPage = () => {
     useEffect(() => {
         fetchNotifications();
 
-        const socket = io(import.meta.env.VITE_API_URL);
-        socket.on('new_notification', (data) => {
+        if (!socket) return;
+
+        const handleNewNotification = (data) => {
             if (data.userId && data.userId !== user?._id) return;
             if (data.targetRole && data.targetRole !== 'all' && data.targetRole !== user?.role) return;
             fetchNotifications();
-        });
+        };
 
-        return () => socket.disconnect();
-    }, [user]);
+        socket.on('new_notification', handleNewNotification);
+
+        return () => {
+            socket.off('new_notification', handleNewNotification);
+        };
+    }, [user, socket]);
 
     const markAllRead = async () => {
         try {
@@ -42,21 +48,27 @@ const NotificationsPage = () => {
             // Trigger a re-render or event to refresh sidebar if needed, 
             // but usually sidebar fetches on focus or we can use a custom event.
             window.dispatchEvent(new Event('notifications_read'));
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            if (import.meta.env.DEV) console.error(e); 
+        }
     };
 
     const markRead = async (id) => {
         try {
             await api.put(`/notifications/${id}/read`);
             setNotifications(prev => prev.map(n => n._id === id ? { ...n, read: true } : n));
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            if (import.meta.env.DEV) console.error(e); 
+        }
     };
 
     const deleteNotif = async (id) => {
         try {
             await api.delete(`/notifications/${id}`);
             setNotifications(prev => prev.filter(n => n._id !== id));
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            if (import.meta.env.DEV) console.error(e); 
+        }
     };
 
     const getIcon = (type) => {

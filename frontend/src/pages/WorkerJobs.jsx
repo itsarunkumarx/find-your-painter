@@ -7,6 +7,7 @@ import {
     FaPaintRoller
 } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import Chat from '../components/Chat'; // Moved this import here
 
 const subStatusMap = {
@@ -28,7 +29,7 @@ const WorkerJobs = () => {
     const handleUpdateStatus = async (id, status, subStatus = null) => {
         const result = await updateBookingStatus(id, status, subStatus);
         if (!result.success) {
-            alert(result.message);
+            toast.error(result.message);
         }
     };
 

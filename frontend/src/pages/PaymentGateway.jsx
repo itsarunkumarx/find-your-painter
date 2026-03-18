@@ -19,7 +19,7 @@ const PaymentGateway = () => {
                 const found = data.find(b => b._id === bookingId);
                 setBooking(found);
             } catch (e) { 
-                console.error(e); 
+                if (import.meta.env.DEV) console.error(e); 
             } finally { 
                 setLoading(false); 
             }
@@ -39,7 +39,7 @@ const PaymentGateway = () => {
                 setSuccess(true);
                 setTimeout(() => navigate('/my-bookings'), 3000);
             } catch (e) {
-                console.error(e);
+                if (import.meta.env.DEV) console.error(e);
                 setProcessing(false);
             }
         }, 2000);
@@ -52,7 +52,7 @@ const PaymentGateway = () => {
             setSuccess(true);
             setTimeout(() => navigate('/my-bookings'), 3000);
         } catch (e) {
-            console.error(e);
+            if (import.meta.env.DEV) console.error(e);
             setProcessing(false);
         }
     };

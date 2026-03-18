@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../utils/api';
+import fastApi from '../utils/fastApi';
 import { useTranslation } from 'react-i18next';
 import { FaSearch, FaFilter, FaStar, FaMapMarkerAlt, FaTools, FaCrown } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
@@ -20,13 +21,17 @@ const ExplorePainters = () => {
     const navigate = useNavigate();
 
     const fetchWorkers = async (showLoading = true) => {
-        if (showLoading) setLoading(true);
-        else setIsRefreshing(true);
+        // Only show full loading if we have NO workers yet
+        if (showLoading && !workers.length) setLoading(true);
+        else if (!showLoading) setIsRefreshing(true);
+        
         try {
-            const res = await api.get('/workers');
-            setWorkers(res.data);
+            await fastApi.getWithCache('/workers', (data, isCached) => {
+                setWorkers(data || []);
+                if (isCached && loading) setLoading(false);
+            }, { forceRefresh: !showLoading });
         } catch (error) {
-            console.error("Fetch experts error", error);
+            if (import.meta.env.DEV) console.error("Fetch experts error", error);
         } finally {
             setLoading(false);
             setIsRefreshing(false);
@@ -176,7 +181,13 @@ const ExplorePainters = () => {
                                 {compareList.map(w => (
                                     <div key={w._id} className="text-center space-y-6 sm:space-y-8 bg-[var(--bg-highlight)]/30 p-4 sm:p-0 rounded-2xl sm:rounded-none">
                                         <div className="h-20 sm:h-24 flex flex-col items-center">
-                                            <img src={w.user?.profileImage || "/assets/premium-avatar.png"} className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-[var(--bg-highlight)] mb-2 sm:mb-3 shadow-lg" loading="lazy" />
+                                            <img 
+                                                src={w.user?.profileImage || "/assets/premium-avatar.png"} 
+                                                className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-[var(--bg-highlight)] mb-2 sm:mb-3 shadow-lg" 
+                                                loading="lazy" 
+                                                width="64"
+                                                height="64"
+                                            />
                                             <p className="font-black text-[var(--text-main)] text-[10px] sm:text-sm truncate w-full">{w.user?.name}</p>
                                         </div>
                                         <div className="sm:h-px bg-[var(--glass-border)] sm:visible invisible" />

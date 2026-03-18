@@ -80,20 +80,31 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
 
-    const urlToOpen = new URL(event.notification.data.url, self.location.origin).href;
+    const data = event.notification.data || {};
+    const urlToOpen = new URL(data.url || '/', self.location.origin).href;
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+            // If the user clicked "Accept", we append a query param to tell the app to answer
+            const finalUrl = event.action === 'accept' 
+                ? `${urlToOpen}${urlToOpen.includes('?') ? '&' : '?'}autoAccept=true` 
+                : urlToOpen;
+
             // Check if there is already a window open
             for (let i = 0; i < windowClients.length; i++) {
                 const client = windowClients[i];
                 if (client.url === urlToOpen && 'focus' in client) {
+                    if (event.action === 'accept') {
+                        // Tell the existing client to accept the call via postMessage
+                        client.postMessage({ type: 'ACCEPT_CALL_VIA_NOTIF' });
+                    }
                     return client.focus();
                 }
             }
-            // If no window is open, open a new one
+
+            // If no window is open, open a new one with the autoAccept param
             if (clients.openWindow) {
-                return clients.openWindow(urlToOpen + (event.action === 'accept' ? '?action=accept' : ''));
+                return clients.openWindow(finalUrl);
             }
         })
     );

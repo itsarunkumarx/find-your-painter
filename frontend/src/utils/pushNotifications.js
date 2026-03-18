@@ -26,7 +26,7 @@ export const subscribeToNotifications = async () => {
             window._pushSubscribed = true;
         }
     } catch (error) {
-        console.error('Push subscription failed:', error);
+        if (import.meta.env.DEV) console.error('Push subscription failed:', error);
     }
 };
 

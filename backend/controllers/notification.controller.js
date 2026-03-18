@@ -84,6 +84,20 @@ export const subscribe = async (req, res) => {
     }
 };
 
+export const unsubscribe = async (req, res) => {
+    try {
+        const { endpoint } = req.body;
+        const userId = req.user.id;
+
+        await Subscription.deleteOne({ endpoint, user: userId });
+
+        res.status(200).json({ message: 'Unsubscribed successfully' });
+    } catch (error) {
+        console.error('Unsubscribe error:', error);
+        res.status(500).json({ message: 'Failed to unsubscribe' });
+    }
+};
+
 // Internal helper for database notifications + socket emit
 export const createNotification = async ({ user, type, title, message, link, icon, io }) => {
     try {

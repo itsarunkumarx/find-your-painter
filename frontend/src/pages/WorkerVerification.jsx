@@ -16,7 +16,7 @@ const WorkerVerification = () => {
                 const { data } = await api.get('/workers/profile');
                 setWorker(data);
             } catch (error) {
-                console.error("Fetch profile error", error);
+                if (import.meta.env.DEV) console.error("Fetch profile error", error);
             } finally {
                 setLoading(false);
             }

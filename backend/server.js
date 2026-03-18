@@ -22,6 +22,8 @@ import { createCallRecord, updateCallRecord } from './controllers/call.controlle
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { Worker } from './models/Worker.js';
+import { CallHistory } from './models/CallHistory.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,15 +33,34 @@ dotenv.config();
 const app = express();
 app.use(compression());
 const server = http.createServer(app);
+const allowedOrigins = [
+    (process.env.FRONTEND_URL || '').trim(),
+    'http://localhost:5173',
+    'http://127.0.0.1:5173'
+].filter(Boolean);
+
 const io = new Server(server, {
     cors: {
-        origin: process.env.FRONTEND_URL || '*',
+        origin: (origin, callback) => {
+            if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
+                callback(null, true);
+            } else {
+                callback(null, false);
+            }
+        },
         methods: ['GET', 'POST']
     }
 });
+console.log('[SOCKET_INIT] Allowing origins:', allowedOrigins);
 
 app.use(cors({
-    origin: process.env.FRONTEND_URL || '*',
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     credentials: true
 }));
@@ -63,12 +84,16 @@ app.use('/api/support', supportRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/calls', callRoutes);
 
-// Static Uploads Folder
+// Static Uploads Folder - optimized with caching headers
 const uploadPath = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadPath)) {
     fs.mkdirSync(uploadPath, { recursive: true });
 }
-app.use('/uploads', express.static(uploadPath));
+app.use('/uploads', express.static(uploadPath, {
+    maxAge: '1y',
+    immutable: true,
+    index: false
+}));
 
 // Database
 const connectDB = async () => {
@@ -90,12 +115,13 @@ const workerToUser = new Map(); // workerId -> userId (for resolving signaling t
 const activeCalls = new Map(); // socket.id -> callRecordId
 
 io.on('connection', (socket) => {
-    console.log('Socket connected:', socket.id);
+    // console.log('Socket connected:', socket.id);
 
     // Track user when they explicitly signal being online
     socket.on('user_online', async (userId) => {
-        if (!userId) return;
-        const uid = userId.toString();
+        const uid = (userId || '').toString().trim();
+        if (!uid) return;
+
         if (!onlineUsers.has(uid)) {
             onlineUsers.set(uid, new Set());
         }
@@ -103,22 +129,34 @@ io.on('connection', (socket) => {
 
         // Map workerId to userId for resolve-less signaling
         try {
-            const worker = await mongoose.model('Worker').findOne({ user: uid });
-            if (worker) {
-                workerToUser.set(worker._id.toString(), uid);
+            if (mongoose.Types.ObjectId.isValid(uid)) {
+                const WorkerModel = mongoose.model('Worker');
+                const worker = await WorkerModel.findOne({ user: uid });
+                if (worker) {
+                    const wid = worker._id.toString().trim();
+                    workerToUser.set(wid, uid);
+                    // console.log(`[SIGNALLING] Worker Map Updated: ${wid} ➡️ ${uid}`);
+                }
+            } else {
+                // console.warn(`[SIGNALLING] Invalid userId format for worker mapping: ${uid}`);
             }
         } catch (e) {
-            // Model might not be loaded yet or user isn't a worker
+            console.error('[SIGNALLING] Worker mapping error:', e.message);
         }
 
         io.emit('online_users', Array.from(onlineUsers.keys()));
-        console.log(`User ${uid} online → sockets count: ${onlineUsers.get(uid).size}`);
+        // console.log(`[SIGNALLING] User ${uid} registered online. Sockets: ${onlineUsers.get(uid).size} | Map Size: ${onlineUsers.size}`);
+    });
+
+    socket.on('ping_server', (data) => {
+        // console.log(`[DIAG] Ping from socket ${socket.id} | User ${data.uid || 'unknown'}`);
+        socket.emit('pong_client', data);
     });
 
     // Join/Leave chat rooms
     socket.on('join_chat', (bookingId) => {
         socket.join(bookingId);
-        console.log(`Socket ${socket.id} joined room: ${bookingId}`);
+        // console.log(`Socket ${socket.id} joined room: ${bookingId}`);
     });
 
     socket.on('leave_chat', (bookingId) => socket.leave(bookingId));
@@ -138,131 +176,237 @@ io.on('connection', (socket) => {
     // ── WebRTC Call Signaling ─────────────────────────────────────────────────
 
     socket.on('call_offer', async ({ toUserId, fromUserId, fromUserName, fromUserImage, callType, offer }) => {
-        let targetUid = toUserId.toString();
+        const targetUidRaw = (toUserId || '').toString().trim();
+        const senderUid = (fromUserId || '').toString().trim();
+        // console.log(`[CALL_OFFER] Incoming: From=${senderUid} To=${targetUidRaw} Type=${callType}`);
+        
+        if (!targetUidRaw || !senderUid) {
+            console.error('[CALL_OFFER] ERROR: Missing recipient or sender ID');
+            return;
+        }
+
+        let targetUid = targetUidRaw;
         // Resolve workerId to userId if necessary
         if (workerToUser.has(targetUid)) {
-            console.log(`[Socket] Resolving workerId ${targetUid} to userId ${workerToUser.get(targetUid)}`);
+            console.log(`[SIGNALLING] Resolved workerId ${targetUid} from MAP to userId ${workerToUser.get(targetUid)}`);
             targetUid = workerToUser.get(targetUid);
+        } else {
+            // DATABASE FALLBACK: If map missed, query the DB
+            try {
+                if (mongoose.Types.ObjectId.isValid(targetUid)) {
+                    const WorkerModel = mongoose.model('Worker');
+                    const worker = await WorkerModel.findById(targetUid);
+                    if (worker) {
+                        const resolvedUid = worker.user.toString().trim();
+                        console.log(`[SIGNALLING] Resolved workerId ${targetUid} from DB to userId ${resolvedUid}`);
+                        workerToUser.set(targetUid, resolvedUid); // Cache it
+                        targetUid = resolvedUid;
+                    }
+                }
+            } catch (e) {
+                console.error('[SIGNALLING] Worker resolution error:', e.message);
+            }
         }
 
         const targetSockets = onlineUsers.get(targetUid);
-
-        const callRecord = await mongoose.model('CallHistory').create({
-            caller: fromUserId,
-            receiver: toUserId,
-            type: callType || 'voice',
-            status: targetSockets && targetSockets.size > 0 ? 'ringing' : 'missed',
-            startTime: Date.now()
-        }).catch(err => console.error('Call log error:', err));
-
-        if (callRecord) activeCalls.set(socket.id, callRecord._id);
+        
+        // Safety check to prevent self-calling loop
+        if (targetUid === senderUid) {
+            console.warn('[CALL_OFFER] Blocked: User is calling themselves.');
+            return;
+        }
 
         if (targetSockets && targetSockets.size > 0) {
+            // console.log(`[CALL_OFFER] SUCCESS: Found ${targetSockets.size} sockets for target ${targetUid}. Emitting incoming_call...`);
             targetSockets.forEach(sid => {
                 io.to(sid).emit('incoming_call', { 
-                    fromUserId, 
+                    fromUserId: senderUid, 
                     fromUserName, 
                     fromUserImage, 
                     callType, 
                     offer, 
-                    callId: callRecord?._id,
+                    callId: null, // We'll update this or use a temp ID if needed, but priority is SPEED
                     timestamp: Date.now() 
                 });
             });
-        } else {
-            socket.emit('call_waiting', { message: 'User is offline. Sending push notification...' });
-            await createNotification({
-                user: toUserId,
-                type: 'system',
-                title: 'Missed Call',
-                message: `You missed a ${callType} call from ${fromUserName}.`,
-                icon: callType === 'video' ? '📹' : '📞'
-            });
+            socket.emit('call_signal_sent', { targetUid, socketCount: targetSockets.size });
         }
 
+        let callRecord;
         try {
-            await sendCallNotification(toUserId, {
-                callerId: fromUserId,
-                callerName: fromUserName,
-                callerImage: fromUserImage,
-                callType,
-                callId: callRecord?._id || `${fromUserId}-${Date.now()}`
-            });
-        } catch (error) {
-            console.error('Failed to send push notification:', error);
+            // Verify IDs are valid ObjectIds before creating record
+            const isCallerValid = mongoose.Types.ObjectId.isValid(senderUid);
+            const isReceiverValid = mongoose.Types.ObjectId.isValid(targetUid);
+
+            if (isCallerValid && isReceiverValid) {
+                callRecord = await CallHistory.create({
+                    caller: senderUid,
+                    receiver: targetUid,
+                    type: callType || 'voice',
+                    status: targetSockets && targetSockets.size > 0 ? 'active' : 'missed',
+                    startTime: Date.now()
+                });
+
+                // Update the callId for the receiver if they are online (Optional: most clients handle null callId for signaling speed)
+                if (targetSockets && targetSockets.size > 0) {
+                     targetSockets.forEach(sid => io.to(sid).emit('call_id_update', { callId: callRecord._id }));
+                }
+            } else {
+                console.warn(`[SIGNALLING] Skipping DB record: Invalid ID format (Caller: ${senderUid}, Receiver: ${targetUid})`);
+                callRecord = { _id: 'temp_' + Date.now() };
+            }
+        } catch (err) {
+            console.error('[SIGNALLING] CallRecord creation failed:', err.message);
+            callRecord = { _id: 'temp_' + Date.now() }; 
+        }
+
+        if (callRecord && callRecord._id) activeCalls.set(socket.id, callRecord._id);
+
+        if (!targetSockets || targetSockets.size === 0) {
+            console.warn(`[CALL_OFFER] Target ${targetUid} is OFFLINE.`);
+            socket.emit('call_target_offline', { targetUid });
+            
+            try {
+                if (mongoose.Types.ObjectId.isValid(targetUidRaw)) {
+                    await createNotification({
+                        user: targetUidRaw,
+                        type: 'system',
+                        title: 'Missed Call',
+                        message: `You missed a ${callType} call from ${fromUserName}.`,
+                        icon: callType === 'video' ? '📹' : '📞'
+                    });
+
+                    await sendCallNotification(targetUidRaw, {
+                        callerId: senderUid,
+                        callerName: fromUserName,
+                        callerImage: fromUserImage,
+                        callType,
+                        callId: callRecord?._id || `${senderUid}-${Date.now()}`
+                    });
+                }
+            } catch (err) {
+                console.error('[SIGNALLING] Push fallback failed:', err.message);
+            }
         }
     });
 
     socket.on('call_received', ({ toUserId }) => {
-        let targetUid = toUserId.toString();
+        let targetUid = (toUserId || '').toString().trim();
         if (workerToUser.has(targetUid)) targetUid = workerToUser.get(targetUid);
         const callerSockets = onlineUsers.get(targetUid);
+        // console.log(`[SIGNALLING] Call received ACK from recipient. Pinging caller: ${targetUid}`);
         if (callerSockets) callerSockets.forEach(sid => io.to(sid).emit('call_ringing'));
     });
 
     socket.on('call_answer', ({ toUserId, answer, callId }) => {
-        let targetUid = toUserId.toString();
-        if (workerToUser.has(targetUid)) targetUid = workerToUser.get(targetUid);
-        const targetSockets = onlineUsers.get(targetUid);
-        if (targetSockets) targetSockets.forEach(sid => io.to(sid).emit('call_answered', { answer }));
-        
-        // Notify other sockets of the receiver that call was accepted elsewhere
-        let receiverId = null;
-        for (const [uid, sockets] of onlineUsers.entries()) {
-            if (sockets.has(socket.id)) { receiverId = uid; break; }
+        try {
+            let targetUid = (toUserId || '').toString().trim();
+            if (workerToUser.has(targetUid)) targetUid = workerToUser.get(targetUid);
+            const targetSockets = onlineUsers.get(targetUid);
+            if (targetSockets) {
+                targetSockets.forEach(sid => io.to(sid).emit('call_answered', { answer }));
+            }
+            
+            // Notify other sockets of the receiver that call was accepted elsewhere
+            let receiverId = null;
+            for (const [uid, sockets] of onlineUsers.entries()) {
+                if (sockets.has(socket.id)) { receiverId = uid; break; }
+            }
+            if (receiverId && onlineUsers.has(receiverId)) {
+                onlineUsers.get(receiverId).forEach(sid => {
+                    if (sid !== socket.id) io.to(sid).emit('call_accepted_elsewhere');
+                });
+            }
+            if (callId) activeCalls.set(socket.id, callId);
+        } catch (err) {
+            console.error('[SIGNALLING] call_answer error:', err.message);
         }
-        if (receiverId) {
-            onlineUsers.get(receiverId).forEach(sid => {
-                if (sid !== socket.id) io.to(sid).emit('call_accepted_elsewhere');
-            });
-        }
-        if (callId) activeCalls.set(socket.id, callId);
     });
 
     socket.on('call_reject', async ({ toUserId, reason }) => {
-        let targetUid = toUserId.toString();
-        if (workerToUser.has(targetUid)) targetUid = workerToUser.get(targetUid);
-        const targetSockets = onlineUsers.get(targetUid);
-        const callId = activeCalls.get(socket.id);
-        if (callId) {
-            await updateCallRecord(callId, { status: 'rejected', endTime: Date.now() });
-            activeCalls.delete(socket.id);
-        }
-        if (targetSockets) targetSockets.forEach(sid => io.to(sid).emit('call_rejected', { reason: reason || 'Call declined.' }));
-        
-        // Notify other sockets of the rejecter
-        let rejecterId = null;
-        for (const [uid, sockets] of onlineUsers.entries()) {
-            if (sockets.has(socket.id)) { rejecterId = uid; break; }
-        }
-        if (rejecterId) {
-            onlineUsers.get(rejecterId).forEach(sid => {
-                if (sid !== socket.id) io.to(sid).emit('call_rejected_elsewhere');
-            });
+        try {
+            let targetUid = (toUserId || '').toString().trim();
+            if (workerToUser.has(targetUid)) targetUid = workerToUser.get(targetUid);
+            const targetSockets = onlineUsers.get(targetUid);
+            const callId = activeCalls.get(socket.id);
+            if (callId && mongoose.Types.ObjectId.isValid(callId)) {
+                await updateCallRecord(callId, { status: 'rejected', endTime: Date.now() });
+                activeCalls.delete(socket.id);
+            }
+            if (targetSockets) {
+                targetSockets.forEach(sid => io.to(sid).emit('call_rejected', { reason: reason || 'Call declined.' }));
+            }
+            
+            // Notify other sockets of the rejecter
+            let rejecterId = null;
+            for (const [uid, sockets] of onlineUsers.entries()) {
+                if (sockets.has(socket.id)) { rejecterId = uid; break; }
+            }
+            if (rejecterId && onlineUsers.has(rejecterId)) {
+                onlineUsers.get(rejecterId).forEach(sid => {
+                    if (sid !== socket.id) io.to(sid).emit('call_rejected_elsewhere');
+                });
+            }
+        } catch (err) {
+            console.error('[SIGNALLING] call_reject error:', err.message);
         }
     });
 
     socket.on('call_end', async ({ toUserId }) => {
-        let targetUid = toUserId.toString();
-        if (workerToUser.has(targetUid)) targetUid = workerToUser.get(targetUid);
-        const targetSockets = onlineUsers.get(targetUid);
-        const callId = activeCalls.get(socket.id);
-        if (callId) {
-            const call = await mongoose.model('CallHistory').findById(callId);
-            if (call) {
-                const duration = Math.round((Date.now() - new Date(call.startTime)) / 1000);
-                await updateCallRecord(callId, { status: 'completed', endTime: Date.now(), duration });
+        try {
+            let targetUid = (toUserId || '').toString().trim();
+            if (workerToUser.has(targetUid)) targetUid = workerToUser.get(targetUid);
+            const targetSockets = onlineUsers.get(targetUid);
+            const callId = activeCalls.get(socket.id);
+            if (callId && mongoose.Types.ObjectId.isValid(callId)) {
+                try {
+                    const call = await mongoose.model('CallHistory').findById(callId);
+                    if (call) {
+                        const duration = Math.round((Date.now() - new Date(call.startTime)) / 1000);
+                        await updateCallRecord(callId, { status: 'completed', endTime: Date.now(), duration });
+                    }
+                } catch (err) {
+                    console.error('[SIGNALLING] Call end update failed:', err.message);
+                }
+                activeCalls.delete(socket.id);
             }
-            activeCalls.delete(socket.id);
+            if (targetSockets) targetSockets.forEach(sid => io.to(sid).emit('call_ended'));
+        } catch (err) {
+            console.error('[SIGNALLING] call_end error:', err.message);
         }
-        if (targetSockets) targetSockets.forEach(sid => io.to(sid).emit('call_ended'));
+    });
+
+    socket.on('call_cancel', async ({ toUserId, reason }) => {
+        try {
+            let targetUid = (toUserId || '').toString().trim();
+            if (workerToUser.has(targetUid)) targetUid = workerToUser.get(targetUid);
+            const targetSockets = onlineUsers.get(targetUid);
+            const callId = activeCalls.get(socket.id);
+            
+            console.log(`[CALL_CANCEL] From=${socket.id} To=${targetUid} Reason=${reason}`);
+
+            if (callId && mongoose.Types.ObjectId.isValid(callId)) {
+                await updateCallRecord(callId, { status: 'cancelled', endTime: Date.now() });
+                activeCalls.delete(socket.id);
+            }
+            // Notify receiver to hide the incoming call modal
+            if (targetSockets) {
+                targetSockets.forEach(sid => io.to(sid).emit('call_ended'));
+            }
+        } catch (err) {
+            console.error('[SIGNALLING] call_cancel error:', err.message);
+        }
     });
 
     socket.on('ice_candidate', ({ toUserId, candidate }) => {
-        let targetUid = toUserId.toString();
-        if (workerToUser.has(targetUid)) targetUid = workerToUser.get(targetUid);
-        const targetSockets = onlineUsers.get(targetUid);
-        if (targetSockets) targetSockets.forEach(sid => io.to(sid).emit('ice_candidate', { candidate }));
+        try {
+            let targetUid = (toUserId || '').toString().trim();
+            if (workerToUser.has(targetUid)) targetUid = workerToUser.get(targetUid);
+            const targetSockets = onlineUsers.get(targetUid);
+            if (targetSockets) targetSockets.forEach(sid => io.to(sid).emit('ice_candidate', { candidate }));
+        } catch (err) {
+            console.error('[SIGNALLING] ice_candidate error:', err.message);
+        }
     });
 
     socket.on('disconnect', () => {
@@ -298,7 +442,7 @@ server.listen(PORT, () => {
     if (process.env.NODE_ENV === 'production' || process.env.BACKEND_URL) {
         setInterval(() => {
             fetch(url)
-                .then(() => console.log(`Self-ping successful: ${url}`))
+                // .then(() => console.log(`Self-ping successful: ${url}`))
                 .catch(err => console.error(`Self-ping failed: ${err.message}`));
         }, 14 * 60 * 1000); // Ping every 14 minutes
     }

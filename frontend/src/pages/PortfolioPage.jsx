@@ -23,7 +23,9 @@ const PortfolioPage = () => {
             try {
                 const { data } = await api.get('/workers/profile');
                 setImages(data.portfolioImages || []);
-            } catch (e) { console.error(e); } finally { setLoading(false); }
+            } catch (e) { 
+                if (import.meta.env.DEV) console.error(e); 
+            } finally { setLoading(false); }
         };
         fetchPortfolio();
     }, []);
@@ -48,16 +50,21 @@ const PortfolioPage = () => {
             setPreview(null);
             setCaption('');
             fileRef.current.value = '';
-        } catch (e) { console.error(e); } finally { setUploading(false); }
+        } catch (e) { 
+            if (import.meta.env.DEV) console.error(e); 
+        } finally { 
+            setUploading(false); 
+        }
     };
-
     const deleteImage = async (imgId) => {
         if (!window.confirm('Delete this portfolio item?')) return;
         try {
-            const { data } = await api.delete(
-                `/workers/portfolio/${imgId}`);
-            setImages(data);
-        } catch (e) { console.error(e); }
+            await api.delete(`/workers/portfolio/${imgId}`);
+            const { data } = await api.get('/workers/profile');
+            setImages(data.portfolioImages || []);
+        } catch (e) {
+            if (import.meta.env.DEV) console.error(e);
+        }
     };
 
     const toggleFeatured = async (imgId) => {
@@ -66,7 +73,9 @@ const PortfolioPage = () => {
                 `/workers/portfolio/${imgId}/featured`, {}
             );
             setImages(data);
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            if (import.meta.env.DEV) console.error(e); 
+        }
     };
 
     return (

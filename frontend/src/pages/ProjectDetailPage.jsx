@@ -23,7 +23,7 @@ const ProjectDetailPage = () => {
                 const found = data.find(b => b._id === id);
                 setBooking(found);
             } catch (error) {
-                console.error("Fetch error", error);
+                if (import.meta.env.DEV) console.error("Fetch error", error);
             } finally {
                 setLoading(false);
             }

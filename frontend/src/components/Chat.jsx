@@ -1,15 +1,110 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import api from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
-import { useSocket } from '../context/SocketContext';
+import safeStorage from '../utils/safeStorage';
+import { useSocket } from '../hooks/useSocket';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import {
     FaPhone, FaVideo, FaTimes, FaTrash, FaReply, FaSmile,
     FaCheckDouble, FaCheck, FaPaperPlane, FaCircle, FaImage, FaSearch
 } from 'react-icons/fa';
+import toast from 'react-hot-toast';
 
 const EMOJIS = ['😊', '😂', '❤️', '👍', '🙏', '🔥', '😍', '✅', '💯', '🎨', '🖌️', '🏠', '⭐', '👏', '😮'];
+
+const MessageBubble = memo(({ msg, idx, user, t, toggleReaction, setReplyTo, deleteMessage, inputRef }) => {
+    const isOwn = msg.sender?._id === user._id || msg.sender === user._id;
+    return (
+        <motion.div
+            initial={{ opacity: 0, x: isOwn ? 10 : -10, y: 5 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            transition={{ delay: Math.min(idx * 0.05, 0.5), duration: 0.3 }}
+            className={`flex ${isOwn ? 'justify-end' : 'justify-start'} group`}
+        >
+            {!isOwn && (
+                <div className="w-8 h-8 rounded-xl bg-navy-deep/5 border border-navy-deep/10 flex items-center justify-center overflow-hidden mr-2 self-end mb-1 shrink-0">
+                    <img src={msg.sender?.profileImage || "/assets/premium-avatar.png"} className="w-full h-full object-cover" alt="" />
+                </div>
+            )}
+            <div className={`relative max-w-[75%] ${isOwn ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
+                {msg.replyTo && (
+                    <div className={`text-[10px] px-3 py-1.5 rounded-xl border opacity-70 ${isOwn ? 'bg-white/60 border-royal-gold/20 text-right' : 'bg-white border-navy-deep/10'}`}>
+                        <span className="font-black text-royal-gold">{msg.replyTo.sender?.name}</span>
+                        <p className="text-navy-deep/60 truncate max-w-[200px]">{msg.replyTo.message}</p>
+                    </div>
+                )}
+                <div className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl text-[13px] sm:text-sm font-medium leading-relaxed ${msg.isDeleted
+                    ? 'bg-slate-100 text-slate-400 italic border border-slate-200'
+                    : isOwn
+                        ? 'bg-navy-deep text-white shadow-lg shadow-navy-deep/20 rounded-tr-sm'
+                        : 'bg-white text-navy-deep border border-navy-deep/8 shadow-sm rounded-tl-sm'
+                    } relative`}>
+                    {msg.messageType === 'image' ? (
+                        <div className="relative group/img">
+                            <img
+                                src={msg.message}
+                                alt={t('shared_image_alt')}
+                                className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition-opacity shadow-md"
+                                onClick={() => window.open(msg.message, '_blank')}
+                                loading="lazy"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/5 transition-colors pointer-events-none rounded-lg" />
+                        </div>
+                    ) : (
+                        msg.message
+                    )}
+                    {!msg.isDeleted && (
+                        <div className={`absolute -top-3 ${isOwn ? 'right-0' : 'left-0'} flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
+                            <div className="flex bg-white shadow-xl rounded-lg border border-navy-deep/5 p-0.5">
+                                {['❤️', '👍', '🔥'].map(emoji => (
+                                    <button key={emoji} onClick={() => toggleReaction(msg._id, emoji)} className="px-1.5 py-1 hover:bg-slate-50 rounded-md transition-colors text-[10px]">
+                                        {emoji}
+                                    </button>
+                                ))}
+                            </div>
+                            <button onClick={() => { setReplyTo(msg); inputRef.current?.focus(); }}
+                                className="p-1.5 bg-white shadow-xl rounded-lg text-navy-deep/50 hover:text-royal-gold transition-colors border border-navy-deep/5" title={t('reply_tooltip')}>
+                                <FaReply size={10} />
+                            </button>
+                            {isOwn && (
+                                <button onClick={() => deleteMessage(msg._id)}
+                                    className="p-1.5 bg-white shadow-xl rounded-lg text-navy-deep/50 hover:text-red-500 transition-colors border border-navy-deep/5" title={t('delete_tooltip')}>
+                                    <FaTrash size={10} />
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {msg.reactions?.length > 0 && (
+                    <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                        {Object.entries(msg.reactions.reduce((acc, r) => {
+                            acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                            return acc;
+                        }, {})).map(([emoji, count]) => (
+                            <button key={emoji} onClick={() => toggleReaction(msg._id, emoji)}
+                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-black border transition-all ${msg.reactions.some(r => r.userId === user._id && r.emoji === emoji) ? 'bg-royal-gold/10 border-royal-gold text-royal-gold' : 'bg-white border-navy-deep/5 text-navy-deep/40'}`}>
+                                {emoji} {count > 1 && count}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                <div className={`flex items-center gap-1.5 px-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
+                    <span className="text-[9px] font-bold text-navy-deep/30">
+                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {isOwn && !msg.isDeleted && (
+                        msg.read
+                            ? <FaCheckDouble size={10} className="text-royal-gold" />
+                            : <FaCheck size={10} className="text-navy-deep/30" />
+                    )}
+                </div>
+            </div>
+        </motion.div>
+    );
+});
 
 const Chat = ({ booking, onClose }) => {
     const { t } = useTranslation();
@@ -24,6 +119,7 @@ const Chat = ({ booking, onClose }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showSearch, setShowSearch] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const pendingMessagesRef = useRef(new Map()); // tempId -> content for reconciliation
     const messagesEndRef = useRef(null);
     const typingTimeoutRef = useRef(null);
     const inputRef = useRef(null);
@@ -59,14 +155,10 @@ const Chat = ({ booking, onClose }) => {
     const clientUserId = clientContact?.user?._id || clientContact?._id;
 
     const contactName = contact?.name || t('painter_fallback');
+    // FIX: Use contactUserId (the user doc ID) for online check — contact._id is the worker profile ID
     const isContactOnline = useMemo(() => {
-        if (!contact?._id) return false;
-        return onlineUsers.includes(contact._id.toString());
-    }, [onlineUsers, contact?._id]);
-
-    const isContactOnlineByUserId = useMemo(() => {
         if (!contactUserId) return false;
-        return onlineUsers.includes(contactUserId.toString());
+        return onlineUsers.some(uid => uid.toString() === contactUserId.toString());
     }, [onlineUsers, contactUserId]);
 
     useEffect(() => {
@@ -78,18 +170,42 @@ const Chat = ({ booking, onClose }) => {
         socket.emit('join_chat', booking._id);
 
         socket.on('new_message', (message) => {
-            const isTargetRoom = message.booking === booking._id || message.booking?._id === booking._id;
-            // Fix 6: robust string comparison to prevent type mismatch duplicates
+            const bookingId = message.booking?._id || message.booking;
+            const isTargetRoom = bookingId?.toString() === booking._id?.toString();
+            if (!isTargetRoom) return;
+
             const senderId = message.sender?._id?.toString() || message.sender?.toString();
             const isOwnMessage = senderId === user?._id?.toString();
 
-            if (isTargetRoom && !isOwnMessage) {
-                setMessages(prev => [...prev, message]);
-                scrollToBottom();
-                api.put(
-                    `/chat/${booking._id}/read`,
-                    {}
-                ).catch(() => { });
+            setMessages(prev => {
+                if (isOwnMessage) {
+                    // Find and replace any temp_ version of this message
+                    const tempIdx = prev.findIndex(
+                        m => m._id?.toString().startsWith('temp_') &&
+                             m.message === message.message &&
+                             m.messageType === message.messageType
+                    );
+                    if (tempIdx !== -1) {
+                        const updated = [...prev];
+                        updated[tempIdx] = message;
+                        return updated;
+                    }
+                    // If no temp found, check for duplicate by real _id
+                    if (prev.some(m => m._id?.toString() === message._id?.toString())) return prev;
+                    return [...prev, message];
+                } else {
+                    // For incoming messages, prevent duplicates
+                    if (prev.some(m => m._id?.toString() === message._id?.toString())) return prev;
+                    return [...prev, message];
+                }
+            });
+
+            // Scroll down for all new messages
+            setTimeout(() => scrollToBottom(), 50);
+
+            // Mark as read for incoming messages
+            if (!isOwnMessage) {
+                api.put(`/chat/${booking._id}/read`, {}).catch(() => {});
             }
         });
         socket.on('user_typing', ({ userId, userName }) => {
@@ -144,7 +260,9 @@ const Chat = ({ booking, onClose }) => {
                 );
                 setMessages(data);
                 setTimeout(scrollToBottom, 100);
-            } catch (error) { console.error(error); }
+            } catch (error) { 
+                if (import.meta.env.DEV) console.error(error); 
+            }
         };
         fetchMessages();
     }, [booking._id, scrollToBottom]);
@@ -169,9 +287,9 @@ const Chat = ({ booking, onClose }) => {
         clearTimeout(typingTimeoutRef.current);
         socket?.emit('stop_typing', { bookingId: booking._id, userId: user._id });
 
-        // Optimistic UI — show message immediately
+        // Optimistic UI — use temp_ prefix so reconciler can find it
         const optimistic = {
-            _id: Date.now().toString(),
+            _id: `temp_${Date.now()}`,
             booking: booking._id,
             sender: { _id: user._id, name: user.name },
             message: imageUrl || trimmed,
@@ -186,7 +304,7 @@ const Chat = ({ booking, onClose }) => {
         scrollToBottom();
 
         try {
-            const token = localStorage.getItem('token');
+            const token = safeStorage.getItem('token');
             const body = {
                 bookingId: booking._id,
                 message: imageUrl || trimmed,
@@ -234,7 +352,9 @@ const Chat = ({ booking, onClose }) => {
             await api.delete(
                 `/chat/${msgId}`
             );
-        } catch (error) { console.error(error); }
+        } catch (error) { 
+            if (import.meta.env.DEV) console.error(error); 
+        }
     };
 
     const compressImage = (base64Str, maxWidth = 800, maxHeight = 800) => {
@@ -272,15 +392,14 @@ const Chat = ({ booking, onClose }) => {
         if (!file) return;
 
         if (file.size > 10 * 1024 * 1024) {
-            alert(t('image_size_error'));
+            toast.error(t('image_size_error'));
             return;
         }
 
         const reader = new FileReader();
         reader.onloadend = async () => {
             const base64String = reader.result;
-            const compressed = await compressImage(base64String);
-            await sendMessage(null, compressed);
+            await sendMessage(null, base64String);
         };
         reader.readAsDataURL(file);
     };
@@ -348,13 +467,21 @@ const Chat = ({ booking, onClose }) => {
                             ) : (
                                 <>
                                     <button
-                                        onClick={() => startCall({ ...contact, _id: contactUserId }, 'voice')}
+                                        onClick={() => {
+                                            console.log('[CHAT_CALL] Initiating call to:', contactName, 'ID:', contactUserId);
+                                            toast(`Calling Painter: ${contactName}`, { icon: '📞' });
+                                            startCall({ ...contact, _id: contactUserId, name: contactName }, 'voice');
+                                        }}
                                         className="w-9 h-9 sm:w-10 sm:h-10 bg-white border border-navy-deep/5 rounded-xl text-navy-deep/40 hover:text-royal-gold transition-all flex items-center justify-center"
                                         title={t('voice_call')}>
                                         <FaPhone size={12} />
                                     </button>
                                     <button
-                                        onClick={() => startCall({ ...contact, _id: contactUserId }, 'video')}
+                                        onClick={() => {
+                                            console.log('[CHAT_CALL] Initiating video to:', contactName, 'ID:', contactUserId);
+                                            toast(`Video calling: ${contactName}`, { icon: '🎥' });
+                                            startCall({ ...contact, _id: contactUserId, name: contactName }, 'video');
+                                        }}
                                         className="w-9 h-9 sm:w-10 sm:h-10 bg-white border border-navy-deep/5 rounded-xl text-navy-deep/40 hover:text-royal-gold transition-all flex items-center justify-center"
                                         title={t('video_link')}>
                                         <FaVideo size={12} />
@@ -430,102 +557,19 @@ const Chat = ({ booking, onClose }) => {
                                 </span>
                             </div>
 
-                            {groupMessages.map((msg, idx) => {
-                                const isOwn = msg.sender?._id === user._id || msg.sender === user._id;
-                                return (
-                                    <motion.div
-                                        initial={{ opacity: 0, x: isOwn ? 10 : -10, y: 5 }}
-                                        animate={{ opacity: 1, x: 0, y: 0 }}
-                                        transition={{ delay: idx * 0.05, duration: 0.3 }}
-                                        key={msg._id || idx}
-                                        className={`flex ${isOwn ? 'justify-end' : 'justify-start'} group`}
-                                    >
-                                        {!isOwn && (
-                                            <div className="w-8 h-8 rounded-xl bg-navy-deep/5 border border-navy-deep/10 flex items-center justify-center overflow-hidden mr-2 self-end mb-1 shrink-0">
-                                                <img src={msg.sender?.profileImage || "/assets/premium-avatar.png"} className="w-full h-full object-cover" alt="" />
-                                            </div>
-                                        )}
-                                        <div className={`relative max-w-[75%] ${isOwn ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
-                                            {/* Reply preview */}
-                                            {msg.replyTo && (
-                                                <div className={`text-[10px] px-3 py-1.5 rounded-xl border opacity-70 ${isOwn ? 'bg-white/60 border-royal-gold/20 text-right' : 'bg-white border-navy-deep/10'}`}>
-                                                    <span className="font-black text-royal-gold">{msg.replyTo.sender?.name}</span>
-                                                    <p className="text-navy-deep/60 truncate max-w-[200px]">{msg.replyTo.message}</p>
-                                                </div>
-                                            )}
-                                            <div className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl text-[13px] sm:text-sm font-medium leading-relaxed ${msg.isDeleted
-                                                ? 'bg-slate-100 text-slate-400 italic border border-slate-200'
-                                                : isOwn
-                                                    ? 'bg-navy-deep text-white shadow-lg shadow-navy-deep/20 rounded-tr-sm'
-                                                    : 'bg-white text-navy-deep border border-navy-deep/8 shadow-sm rounded-tl-sm'
-                                                } relative`}>
-                                                {msg.messageType === 'image' ? (
-                                                    <div className="relative group/img">
-                                                        <img
-                                                            src={msg.message}
-                                                            alt={t('shared_image_alt')}
-                                                            className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition-opacity shadow-md"
-                                                            onClick={() => window.open(msg.message, '_blank')}
-                                                            loading="lazy"
-                                                        />
-                                                        <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/5 transition-colors pointer-events-none rounded-lg" />
-                                                    </div>
-                                                ) : (
-                                                    msg.message
-                                                )}
-                                                {/* Action buttons on hover */}
-                                                {!msg.isDeleted && (
-                                                    <div className={`absolute -top-3 ${isOwn ? 'right-0' : 'left-0'} flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
-                                                        <div className="flex bg-white shadow-xl rounded-lg border border-navy-deep/5 p-0.5">
-                                                            {['❤️', '👍', '🔥'].map(emoji => (
-                                                                <button key={emoji} onClick={() => toggleReaction(msg._id, emoji)} className="px-1.5 py-1 hover:bg-slate-50 rounded-md transition-colors text-[10px]">
-                                                                    {emoji}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                        <button onClick={() => { setReplyTo(msg); inputRef.current?.focus(); }}
-                                                            className="p-1.5 bg-white shadow-xl rounded-lg text-navy-deep/50 hover:text-royal-gold transition-colors border border-navy-deep/5" title={t('reply_tooltip')}>
-                                                            <FaReply size={10} />
-                                                        </button>
-                                                        {isOwn && (
-                                                            <button onClick={() => deleteMessage(msg._id)}
-                                                                className="p-1.5 bg-white shadow-xl rounded-lg text-navy-deep/50 hover:text-red-500 transition-colors border border-navy-deep/5" title={t('delete_tooltip')}>
-                                                                <FaTrash size={10} />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Reactions Display */}
-                                            {msg.reactions?.length > 0 && (
-                                                <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                                                    {Object.entries(msg.reactions.reduce((acc, r) => {
-                                                        acc[r.emoji] = (acc[r.emoji] || 0) + 1;
-                                                        return acc;
-                                                    }, {})).map(([emoji, count]) => (
-                                                        <button key={emoji} onClick={() => toggleReaction(msg._id, emoji)}
-                                                            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-black border transition-all ${msg.reactions.some(r => r.userId === user._id && r.emoji === emoji) ? 'bg-royal-gold/10 border-royal-gold text-royal-gold' : 'bg-white border-navy-deep/5 text-navy-deep/40'}`}>
-                                                            {emoji} {count > 1 && count}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            <div className={`flex items-center gap-1.5 px-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
-                                                <span className="text-[9px] font-bold text-navy-deep/30">
-                                                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </span>
-                                                {isOwn && !msg.isDeleted && (
-                                                    msg.read
-                                                        ? <FaCheckDouble size={10} className="text-royal-gold" />
-                                                        : <FaCheck size={10} className="text-navy-deep/30" />
-                                                )}
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                );
-                            })}
+                            {groupMessages.map((msg, idx) => (
+                                <MessageBubble
+                                    key={msg._id || idx}
+                                    msg={msg}
+                                    idx={idx}
+                                    user={user}
+                                    t={t}
+                                    toggleReaction={toggleReaction}
+                                    setReplyTo={setReplyTo}
+                                    deleteMessage={deleteMessage}
+                                    inputRef={inputRef}
+                                />
+                            ))}
                         </div>
                     ))}
 
@@ -604,8 +648,8 @@ const Chat = ({ booking, onClose }) => {
                                 {showEmoji && (
                                     <motion.div initial={{ opacity: 0, y: 5, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 5, scale: 0.95 }}
                                         className="absolute bottom-14 left-0 bg-white rounded-3xl border border-navy-deep/10 shadow-royal p-4 grid grid-cols-5 gap-3 z-10 w-max min-w-[240px]">
-                                        {EMOJIS.map(e => (
-                                            <button key={e} type="button" onClick={() => addEmoji(e)} className="w-10 h-10 flex items-center justify-center rounded-2xl hover:bg-royal-gold/10 transition-all duration-300 text-xl hover:scale-110 active:scale-90">
+                                        {EMOJIS.map((e, idx) => (
+                                            <button key={e || idx} type="button" onClick={() => addEmoji(e)} className="w-10 h-10 flex items-center justify-center rounded-2xl hover:bg-royal-gold/10 transition-all duration-300 text-xl hover:scale-110 active:scale-90">
                                                 {e}
                                             </button>
                                         ))}

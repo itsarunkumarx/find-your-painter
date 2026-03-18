@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import api from '../utils/api';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import {
     FaUser, FaPhone, FaLock, FaCheck, FaTimes, FaCamera,
     FaShieldAlt, FaMapMarkerAlt, FaEnvelope
@@ -23,7 +24,7 @@ const UserProfile = () => {
     const updateProfile = async (e) => {
         e.preventDefault();
         if (password && password !== confirmPassword) {
-            alert(t('passwords_mismatch') || 'Passwords do not match');
+            toast.error(t('passwords_mismatch') || 'Passwords do not match');
             return;
         }
 
@@ -39,11 +40,11 @@ const UserProfile = () => {
             });
 
             login(data);
-            alert(t('profile_success') || 'Profile updated successfully');
+            toast.success(t('profile_success') || 'Profile updated successfully');
             setPassword('');
             setConfirmPassword('');
         } catch (error) {
-            alert(error.response?.data?.message || t('submission_failed'));
+            toast.error(error.response?.data?.message || t('submission_failed'));
         } finally {
             setLoading(false);
         }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaQuestionCircle, FaLifeRing, FaChevronDown, FaSearch, FaTicketAlt, FaShieldAlt, FaComments, FaPhone } from 'react-icons/fa';
 import api from '../utils/api';
-import { useSocket } from '../context/SocketContext';
+import { useSocket } from '../hooks/useSocket';
 import { toast } from 'react-hot-toast';
 
 const HelpPage = () => {
@@ -39,10 +39,10 @@ const HelpPage = () => {
         setIsSubmitting(true);
         try {
             await api.post('/support', ticketData);
-            alert('Support Ticket Synchronized. Intelligence team will analyze shortly.');
+            toast.success('Support Ticket Synchronized. Intelligence team will analyze shortly.');
             setTicketData({ subject: '', type: 'general', message: '' });
         } catch (_) {
-            alert('Relay failure. Check your connection protocol.');
+            toast.error('Relay failure. Check your connection protocol.');
         } finally {
             setIsSubmitting(false);
         }

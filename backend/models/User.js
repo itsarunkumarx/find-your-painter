@@ -20,6 +20,11 @@ const userSchema = new mongoose.Schema({
         glowIntensity: { type: Number, default: 50 },
         darkMode: { type: Boolean, default: false }
     },
+    notificationPreferences: {
+        email: { type: Boolean, default: true },
+        sms: { type: Boolean, default: false },
+        push: { type: Boolean, default: true }
+    },
     notifications: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Notification' }],
     recentlyViewed: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }],
     savedWorkers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }],

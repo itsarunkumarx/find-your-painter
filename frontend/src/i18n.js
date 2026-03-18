@@ -1,5 +1,6 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import safeStorage from './utils/safeStorage';
 
 const resources = {
     en: {
@@ -12,7 +13,8 @@ const resources = {
             "secure_login": "Secure Login",
             "login_title": "Sign In",
             "welcome_back_user": "Greetings, House Owner",
-            "welcome_back_worker": "Greetings, Operative",
+            "welcome_back_worker": "Greetings, Painter",
+            "welcome_back_admin": "Greetings, Administrator",
             "welcome_back": "Welcome Back",
             "email_label": "Email Address",
             "password_label": "Password",
@@ -769,7 +771,8 @@ const resources = {
             "secure_login": "பாதுகாப்பான உள்நுழைவு",
             "login_title": "உள்நுழைக",
             "welcome_back_user": "வணக்கம், வீட்டு உரிமையாளர்",
-            "welcome_back_worker": "வணக்கம், நிபுணத்துவ வீரர்",
+            "welcome_back_worker": "வணக்கம், ஓவியர்",
+            "welcome_back_admin": "வணக்கம், நிர்வாகி",
             "welcome_back": "மீண்டும் வருக",
             "email_label": "மின்னஞ்சல் முகவரி",
             "password_label": "கடவுச்சொல்",
@@ -1472,7 +1475,7 @@ i18n
     .use(initReactI18next)
     .init({
         resources,
-        lng: localStorage.getItem('language') || 'en',
+        lng: safeStorage.getItem('language') || 'en',
         fallbackLng: 'en',
         debug: false,
         interpolation: {

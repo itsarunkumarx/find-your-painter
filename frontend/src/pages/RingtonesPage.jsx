@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSocket } from '../context/SocketContext';
+import { useSocket } from '../hooks/useSocket';
 import { RINGTONE_SUITES } from '../constants/ringtones';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import {
     FaMusic, FaPlay, FaStop, FaCheckCircle, FaVolumeUp,
     FaSignal, FaHeadphones, FaMicrophoneAlt, FaShieldAlt, FaUpload, FaTrash
@@ -41,7 +42,7 @@ const RingtonesPage = () => {
 
         // Check file size (max 2MB)
         if (file.size > 2 * 1024 * 1024) {
-            alert('File too large. Max size is 2MB.');
+            toast.error('File too large. Max size is 2MB.');
             return;
         }
 
@@ -56,12 +57,12 @@ const RingtonesPage = () => {
                 // Update context is handled via updateUser in Settings, 
                 // but since SocketContext uses useAuth, it should update automatically 
                 // IF we call updateUser.
-                alert(`${type === 'incoming' ? 'Ringtone' : 'Outgoing tone'} uploaded successfully`);
+                toast.success(`${type === 'incoming' ? 'Ringtone' : 'Outgoing tone'} uploaded successfully`);
                 // Force select custom if not already
                 handleSelect('custom', type);
             } catch (err) {
-                console.error('Upload failed:', err);
-                alert('Upload failed. Please try again.');
+                if (import.meta.env.DEV) console.error('Upload failed:', err);
+                toast.error('Upload failed. Please try again.');
             } finally {
                 setUploading(null);
             }
@@ -79,9 +80,9 @@ const RingtonesPage = () => {
             if (audioSettings[type] === 'custom') {
                 handleSelect('standard', type);
             }
-            alert('Custom audio removed');
+            toast.success('Custom audio removed');
         } catch (err) {
-            alert('Removal failed');
+            toast.error('Removal failed');
         }
     };
 

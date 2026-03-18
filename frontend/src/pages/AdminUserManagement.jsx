@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../utils/api';
+import fastApi from '../utils/fastApi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaSearch, FaUserSlash, FaUserCheck, FaEnvelope, FaCalendarAlt, FaShieldAlt, FaUserTimes, FaTrash } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
@@ -16,12 +17,15 @@ const AdminUserManagement = () => {
     const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'danger', title: '', message: '', onConfirm: () => { } });
 
     const fetchUsers = async () => {
+        if (users.length === 0) setLoading(true);
         try {
-            const { data } = await api.get('/admin/users');
-            setUsers(data);
+            // SWR Integration: Instant delivery from cache
+            await fastApi.getWithCache('/admin/users', (data) => {
+                setUsers(data || []);
+                setLoading(false);
+            });
         } catch (error) {
-            console.error('Fetch users failed', error);
-        } finally {
+            if (import.meta.env.DEV) console.error('Fetch users failed', error);
             setLoading(false);
         }
     };

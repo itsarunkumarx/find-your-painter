@@ -33,7 +33,9 @@ const EarningsPage = () => {
                 if (profileRes.data.paymentDetails) {
                     setPayDetails(profileRes.data.paymentDetails);
                 }
-            } catch (e) { console.error(e); } finally { setLoading(false); }
+            } catch (e) { 
+                if (import.meta.env.DEV) console.error(e); 
+            } finally { setLoading(false); }
         };
         fetch();
     }, []);
@@ -44,7 +46,9 @@ const EarningsPage = () => {
             await api.put('/workers/payment-details', payDetails);
             setSaved(true);
             setTimeout(() => setSaved(false), 2500);
-        } catch (e) { console.error(e); } finally { setSaving(false); }
+        } catch (e) { 
+            if (import.meta.env.DEV) console.error(e); 
+        } finally { setSaving(false); }
     };
 
     const StatCard = ({ icon: Icon, label, value, sub, color = 'text-royal-gold' }) => (
@@ -100,7 +104,7 @@ const EarningsPage = () => {
                         <div>
                             <p className="text-[9px] font-black uppercase tracking-[0.3em] text-navy-deep/30 mb-6">Monthly Earnings (₹)</p>
                             {earnings?.monthlyChart?.length > 0 ? (
-                                <ResponsiveContainer width="100%" height={280} minHeight={280}>
+                                <ResponsiveContainer width="100%" height={280} minHeight={280} minWidth={0}>
                                     <AreaChart data={earnings.monthlyChart}>
                                         <defs>
                                             <linearGradient id="earningsGrad" x1="0" y1="0" x2="0" y2="1">

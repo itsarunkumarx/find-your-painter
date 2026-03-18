@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../utils/api';
-import { io } from 'socket.io-client';
+import fastApi from '../utils/fastApi';
+import { useSocket } from '../hooks/useSocket';
 import {
     FaHome, FaCalendarAlt, FaUser, FaSignOutAlt,
     FaBars, FaTimes, FaTachometerAlt, FaChartPie,
@@ -13,8 +14,67 @@ import {
     FaChartBar, FaHeadset, FaInbox, FaStar, FaUserTie, FaMusic, FaHistory, FaCog
 } from 'react-icons/fa';
 
+const SidebarItem = memo(({ link, isActive, isOpen, isMobile, setIsOpen }) => (
+    <Link
+        to={link.path}
+        title={!isOpen ? link.label : ""}
+        onClick={() => {
+            if (isMobile) setIsOpen(false);
+        }}
+        onMouseEnter={() => {
+            // Strategic prefetching based on role and path
+            if (link.path === '/user-dashboard') fastApi.prefetch('/users/dashboard-data');
+            if (link.path === '/worker-dashboard') {
+                fastApi.prefetch('/bookings/worker-bookings');
+                fastApi.prefetch('/workers/profile');
+                fastApi.prefetch('/workers/earnings');
+            }
+            if (link.path === '/explore') fastApi.prefetch('/workers');
+            if (link.path === '/my-bookings') fastApi.prefetch('/bookings/my-bookings');
+            if (link.path === '/worker-jobs') fastApi.prefetch('/bookings/worker-bookings');
+        }}
+        className={`flex items-center gap-4 px-4 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all group relative ${isActive
+            ? 'bg-[var(--text-main)] text-[var(--bg-base)] shadow-2xl shadow-royal-gold/20 font-bold'
+            : 'text-[var(--text-main)] hover:bg-[var(--bg-highlight)] hover:text-[var(--text-main)]'
+            }`}
+    >
+        <div className={`${isActive ? 'text-royal-gold' : 'text-[var(--text-muted)] group-hover:text-royal-gold'} transition-colors shrink-0 relative`}>
+            {link.icon}
+            {!isOpen && !isMobile && link.badge && (
+                <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-royal-gold rounded-full flex items-center justify-center text-[7px] text-[var(--bg-base)] font-black">
+                    {link.badge > 9 ? '9+' : link.badge}
+                </span>
+            )}
+        </div>
+        <AnimatePresence mode="wait">
+            {(isMobile || isOpen) && (
+                <motion.span
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    className={`whitespace-nowrap flex items-center gap-2 ${isActive ? 'text-[var(--bg-base)]' : 'text-[var(--text-main)] group-hover:text-[var(--text-main)]'}`}
+                >
+                    {link.label}
+                    {link.badge && (
+                        <span className="w-5 h-5 bg-royal-gold text-[var(--bg-base)] text-[9px] font-black rounded-full flex items-center justify-center">
+                            {link.badge > 9 ? '9+' : link.badge}
+                        </span>
+                    )}
+                </motion.span>
+            )}
+        </AnimatePresence>
+        {isActive && (
+            <motion.div
+                layoutId="sidebar-active"
+                className="absolute left-0 w-1.5 h-6 bg-royal-gold rounded-r-full"
+            />
+        )}
+    </Link>
+));
+
 const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
     const { user, logout } = useAuth();
+    const { socket } = useSocket();
     const navigate = useNavigate();
     const location = useLocation();
     const { t } = useTranslation();
@@ -35,10 +95,7 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
         };
         fetchCounts();
 
-        const socket = io(import.meta.env.VITE_API_URL);
-        socket.on('connect', () => {
-            socket.emit('user_online', user._id);
-        });
+        if (!socket) return;
 
         socket.on('new_message', (message) => {
             // Only increment if message is not from current user
@@ -64,10 +121,12 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
         window.addEventListener('notifications_read', fetchCounts);
 
         return () => {
-            socket.disconnect();
+            socket.off('new_message');
+            socket.off('messages_read');
+            socket.off('new_notification');
             window.removeEventListener('notifications_read', fetchCounts);
         };
-    }, [user]);
+    }, [user, socket]);
 
     const makeLink = (path, icon, label, badge = null) => ({ path, icon, label, badge: badge > 0 ? badge : null });
 
@@ -183,48 +242,14 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
                     {/* Navigation Cluster */}
                     <nav className="flex-1 space-y-2 px-4 py-4 overflow-y-auto">
                         {links.map((link) => (
-                            <Link
+                            <SidebarItem
                                 key={link.path + link.label}
-                                to={link.path}
-                                title={!isOpen ? link.label : ""}
-                                className={`flex items-center gap-4 px-4 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all group relative ${location.pathname === link.path
-                                    ? 'bg-[var(--text-main)] text-[var(--bg-base)] shadow-2xl shadow-royal-gold/20 font-bold'
-                                    : 'text-[var(--text-main)] hover:bg-[var(--bg-highlight)] hover:text-[var(--text-main)]'
-                                    }`}
-                            >
-                                <div className={`${location.pathname === link.path ? 'text-royal-gold' : 'text-[var(--text-muted)] group-hover:text-royal-gold'} transition-colors shrink-0 relative`}>
-                                    {link.icon}
-                                    {/* Badge on icon when sidebar is collapsed */}
-                                    {!isOpen && !isMobile && link.badge && (
-                                        <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-royal-gold rounded-full flex items-center justify-center text-[7px] text-[var(--bg-base)] font-black">
-                                            {link.badge > 9 ? '9+' : link.badge}
-                                        </span>
-                                    )}
-                                </div>
-                                <AnimatePresence mode="wait">
-                                    {(isMobile || isOpen) && (
-                                        <motion.span
-                                            initial={{ opacity: 0, x: -10 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            exit={{ opacity: 0, x: -10 }}
-                                            className={`whitespace-nowrap flex items-center gap-2 ${location.pathname === link.path ? 'text-[var(--bg-base)]' : 'text-[var(--text-main)] group-hover:text-[var(--text-main)]'}`}
-                                        >
-                                            {link.label}
-                                            {link.badge && (
-                                                <span className="w-5 h-5 bg-royal-gold text-[var(--bg-base)] text-[9px] font-black rounded-full flex items-center justify-center">
-                                                    {link.badge > 9 ? '9+' : link.badge}
-                                                </span>
-                                            )}
-                                        </motion.span>
-                                    )}
-                                </AnimatePresence>
-                                {location.pathname === link.path && (
-                                    <motion.div
-                                        layoutId="sidebar-active"
-                                        className="absolute left-0 w-1.5 h-6 bg-royal-gold rounded-r-full"
-                                    />
-                                )}
-                            </Link>
+                                link={link}
+                                isActive={location.pathname === link.path}
+                                isOpen={isOpen}
+                                isMobile={isMobile}
+                                setIsOpen={setIsOpen}
+                            />
                         ))}
                     </nav>
 
@@ -243,21 +268,12 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
                                 </div>
                             )}
                         </div>
+
                     </div>
                 </div>
             </motion.aside >
 
-            {/* Mobile Bottom Toggle (Visible only when sidebar is closed on small screens) */}
-            {
-                !isOpen && isMobile && (
-                    <button
-                        onClick={() => setIsOpen(true)}
-                        className="fixed bottom-8 right-8 z-[100] bg-[var(--text-main)] text-royal-gold p-5 rounded-3xl shadow-2xl border border-royal-gold/20 backdrop-blur-xl animate-bounce"
-                    >
-                        <FaBars size={24} />
-                    </button>
-                )
-            }
+            {/* Mobile Bottom Toggle - Removed in favor of BottomNav */}
         </>
     );
 };

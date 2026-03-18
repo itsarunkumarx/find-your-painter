@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../utils/api';
+import fastApi from '../utils/fastApi';
 import { useAuth } from '../hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import {
@@ -76,22 +77,27 @@ const UserDashboard = () => {
     };
 
     const fetchData = async (showLoading = true) => {
-        if (showLoading) setLoading(true);
-        else setIsRefreshing(true);
+        // Only show full-screen loading if we have absolutely no data yet
+        if (showLoading && !workers.length) setLoading(true);
+        else if (!showLoading) setIsRefreshing(true);
+
         try {
-            const res = await api.get('/users/dashboard-data');
-            const data = res.data;
-            
-            setWorkers(data.workers);
-            setBookings(data.bookings);
-            setStatsData(data.workerStats);
-            setUserStats(data.userStats);
-            setSavedIds(data.user.savedWorkers.map(w => w._id));
-            setRecentWorkers(data.user.recentlyViewed);
-            setElitePainters((data.workers || []).slice(0, 4));
-            setWorkerProfile(data.workerProfile);
+            await fastApi.getWithCache('/users/dashboard-data', (data, isCached) => {
+                setWorkers(data.workers || []);
+                setBookings(data.bookings || []);
+                setStatsData(data.workerStats);
+                setUserStats(data.userStats);
+                setSavedIds((data.user?.savedWorkers || []).map(w => w._id));
+                setRecentWorkers(data.user?.recentlyViewed || []);
+                setElitePainters((data.workers || []).slice(0, 4));
+                setWorkerProfile(data.workerProfile);
+                
+                // If we got cached data, we stop loading immediately
+                if (isCached && loading) setLoading(false);
+            }, { forceRefresh: !showLoading }); // Use forceRefresh only for interval syncs? 
+            // Actually, getWithCache should handle background refresh automatically.
         } catch (error) {
-            console.error('Fetch error', error);
+            if (import.meta.env.DEV) console.error('Fetch error', error);
         } finally {
             setLoading(false);
             setIsRefreshing(false);
@@ -257,7 +263,14 @@ const UserDashboard = () => {
                                         transition={{ delay: 0.4 + i * 0.1 }}
                                         onClick={() => navigate(`/painter/${worker._id}`)}
                                         className="group cursor-pointer glass-card p-4 sm:p-6 hover:shadow-xl hover:shadow-royal-gold/5 transition-all">
-                                        <img src={worker.user?.profileImage || "/assets/premium-avatar.png"} className="w-full h-28 sm:h-40 object-cover rounded-xl sm:rounded-2xl mb-3 sm:mb-4 grayscale group-hover:grayscale-0 transition-all duration-500" alt={worker.user?.name} />
+                                        <img 
+                                            src={worker.user?.profileImage || "/assets/premium-avatar.png"} 
+                                            className="w-full h-28 sm:h-40 object-cover rounded-xl sm:rounded-2xl mb-3 sm:mb-4 grayscale group-hover:grayscale-0 transition-all duration-500" 
+                                            alt={worker.user?.name} 
+                                            loading="lazy"
+                                            width="200"
+                                            height="160"
+                                        />
                                         <h3 className="text-[10px] sm:text-sm font-black text-[var(--text-main)] truncate">{worker.user?.name}</h3>
                                         <p className="text-[7px] sm:text-[9px] font-bold text-[var(--text-muted)] uppercase mt-0.5 sm:mt-1 truncate">{worker.location}</p>
                                     </motion.div>
@@ -283,7 +296,14 @@ const UserDashboard = () => {
                                             onClick={() => navigate(`/painter/${worker._id}`)}
                                             className="shrink-0 w-36 sm:w-48 group cursor-pointer glass-card p-4 sm:p-5 hover:shadow-lg transition-all">
                                             <div className="relative">
-                                                <img src={worker.user?.profileImage || "/assets/premium-avatar.png"} className="w-full h-24 sm:h-32 object-cover rounded-xl mb-3" alt={worker.user?.name} />
+                                                <img 
+                                                    src={worker.user?.profileImage || "/assets/premium-avatar.png"} 
+                                                    className="w-full h-24 sm:h-32 object-cover rounded-xl mb-3" 
+                                                    alt={worker.user?.name} 
+                                                    loading="lazy"
+                                                    width="150"
+                                                    height="120"
+                                                />
                                                 <div className="absolute inset-0 bg-black/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                     <FaBolt className="text-white" />
                                                 </div>
@@ -311,7 +331,7 @@ const UserDashboard = () => {
                                     </div>
                                 </div>
                                 <div className="h-[300px] w-full">
-                                    <ResponsiveContainer width="100%" height={300}>
+                                    <ResponsiveContainer width="100%" height={300} minWidth={0}>
                                         <BarChart data={statsData.expertiseData}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--glass-border)" opacity={0.1} />
                                             <XAxis

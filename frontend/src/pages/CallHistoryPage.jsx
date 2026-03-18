@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../utils/api';
+import fastApi from '../utils/fastApi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaPhoneAlt, FaVideo, FaPhoneSlash, FaClock, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
@@ -16,11 +17,13 @@ const CallHistoryPage = () => {
     useEffect(() => {
         const fetchHistory = async () => {
             try {
-                const { data } = await api.get('/calls/history');
-                setHistory(data);
+                // SWR Integration: Instant display from cache + background refresh
+                await fastApi.getWithCache('/calls/history', (data) => {
+                    setHistory(data || []);
+                    setLoading(false);
+                });
             } catch (error) {
-                console.error('Failed to fetch call history:', error);
-            } finally {
+                if (import.meta.env.DEV) console.error('Failed to fetch call history:', error);
                 setLoading(false);
             }
         };

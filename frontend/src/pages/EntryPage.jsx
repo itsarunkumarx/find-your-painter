@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import safeStorage from '../utils/safeStorage';
 import { FaShieldAlt, FaHome, FaCity, FaUserFriends, FaPaintRoller, FaGlobe, FaChevronDown, FaCheck, FaAndroid, FaDownload, FaApple } from 'react-icons/fa';
 import useDeviceDetect from '../hooks/useDeviceDetect';
 
@@ -60,7 +62,7 @@ const EntryPage = () => {
     const handleInstallClick = async () => {
         if (!deferredPrompt) {
             // Provide immediate feedback if the signal hasn't fired yet
-            alert(t('manual_install_alert'));
+            toast.error(t('manual_install_alert'));
             return;
         }
 
@@ -72,7 +74,7 @@ const EntryPage = () => {
                 setDeferredPrompt(null);
             }
         } catch (error) {
-            console.error('Installation failed:', error);
+            if (import.meta.env.DEV) console.error('Installation failed:', error);
         }
     };
 
@@ -80,7 +82,7 @@ const EntryPage = () => {
 
     const changeLanguage = (lng) => {
         i18n.changeLanguage(lng);
-        localStorage.setItem('language', lng);
+        safeStorage.setItem('language', lng);
         setLangOpen(false);
     };
 

@@ -72,7 +72,7 @@ const LoginPage = () => {
                         {t('login_title')}
                     </div>
                     <h2 className="title-royal text-4xl sm:text-5xl md:text-6xl mb-4 sm:mb-6 bg-gradient-to-b from-[var(--text-main)] to-[var(--text-muted)] bg-clip-text text-transparent">
-                        {role === 'worker' ? t('welcome_back_worker') : t('welcome_back_user')}
+                        {role === 'worker' ? t('welcome_back_worker') : role === 'admin' ? t('welcome_back_admin') : t('welcome_back_user')}
                     </h2>
                     <p className="text-[var(--text-muted)] font-bold uppercase tracking-widest text-[8px] sm:text-[10px] opacity-60">{t('elite_portal')}</p>
                 </div>

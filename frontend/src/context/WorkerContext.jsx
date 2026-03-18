@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import api from '../utils/api';
+import fastApi from '../utils/fastApi';
 import { WorkerContext } from './WorkerContextDefinition';
 import { useAuth } from '../hooks/useAuth';
 
@@ -23,36 +24,33 @@ export const WorkerProvider = ({ children }) => {
         const now = Date.now();
         if (!force && now - lastFetchRef.current < 5000) return;
 
-        if (force) setLoading(true);
-        else setIsRefreshing(true);
+        // Only show full loading if we have no worker data yet
+        if (force && !worker) setLoading(true);
+        else if (!force) setIsRefreshing(true);
         
         setError(null);
         try {
-            const [bookingsRes, workerRes, earningsRes] = await Promise.all([
-                api.get('/bookings/worker-bookings').catch(() => ({ data: [] })),
-                api.get('/workers/profile').catch(() => ({ data: null })),
-                api.get('/workers/earnings').catch(() => ({ data: null }))
+            // Parallelized SWR fetching for all worker-critical data
+            await Promise.all([
+                fastApi.getWithCache('/bookings/worker-bookings', (data) => setBookings(data || []), { forceRefresh: force }),
+                fastApi.getWithCache('/workers/profile', (workerData) => {
+                    setWorker(workerData);
+                    if (workerData?._id) {
+                        fastApi.getWithCache(`/reviews/worker/${workerData._id}`, (revs) => setReviews(revs || []), { forceRefresh: force });
+                    }
+                }, { forceRefresh: force }),
+                fastApi.getWithCache('/workers/earnings', (data) => setEarnings(data), { forceRefresh: force })
             ]);
-
-            const workerData = workerRes.data;
-            setBookings(bookingsRes.data);
-            setWorker(workerData);
-            setEarnings(earningsRes.data);
-
-            if (workerData?._id) {
-                const reviewsRes = await api.get(`/reviews/worker/${workerData._id}`).catch(() => ({ data: [] }));
-                setReviews(reviewsRes.data || []);
-            }
 
             lastFetchRef.current = Date.now();
         } catch (err) {
-            console.error("Worker data fetch error", err);
+            if (import.meta.env.DEV) console.error("Worker data fetch error", err);
             setError(err.message || 'Failed to fetch worker intelligence');
         } finally {
             setLoading(false);
             setIsRefreshing(false);
         }
-    }, [user]);
+    }, [user, worker]);
 
     useEffect(() => {
         if (user?.role === 'worker') {
@@ -80,7 +78,7 @@ export const WorkerProvider = ({ children }) => {
             setBookings(prev => prev.map(b => b._id === id ? { ...b, ...data } : b));
             return { success: true };
         } catch (error) {
-            console.error("Status update error", error);
+            if (import.meta.env.DEV) console.error("Status update error", error);
             return {
                 success: false,
                 message: error.response?.data?.message || 'Synchronization failed'
@@ -98,7 +96,7 @@ export const WorkerProvider = ({ children }) => {
             setWorker(prev => ({ ...prev, isAvailable: data.isAvailable }));
             return { success: true, isAvailable: data.isAvailable };
         } catch (error) {
-            console.error("Toggle availability error", error);
+            if (import.meta.env.DEV) console.error("Toggle availability error", error);
             return { success: false, message: 'Directive rejected' };
         }
     };
@@ -109,7 +107,7 @@ export const WorkerProvider = ({ children }) => {
             setBookings(prev => prev.map(b => b._id === id ? { ...b, paymentStatus: 'paid' } : b));
             return { success: true };
         } catch (error) {
-            console.error("Payment confirmation error", error);
+            if (import.meta.env.DEV) console.error("Payment confirmation error", error);
             return { success: false, message: "Receipt confirmation failed" };
         }
     };

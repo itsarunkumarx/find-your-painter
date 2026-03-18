@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import api from '../utils/api';
+import fastApi from '../utils/fastApi';
 import { useTranslation } from 'react-i18next';
 import {
     FaUsers, FaTools, FaCalendarAlt, FaCreditCard, FaChartBar,
@@ -34,16 +35,16 @@ const AdminDashboard = () => {
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                const [statsRes, usersRes, workersRes] = await Promise.all([
-                    api.get('/admin/stats'),
-                    api.get('/admin/users'),
-                    api.get('/admin/workers')
+                // SWR Integration: Parallel fetching with instant cache delivery
+                await Promise.all([
+                    fastApi.getWithCache('/admin/stats', (data) => setStats(data)),
+                    fastApi.getWithCache('/admin/users', (data) => setRecentUsers((data || []).slice(0, 5))),
+                    fastApi.getWithCache('/admin/workers', (data) => setRecentWorkers((data || []).slice(0, 5)))
                 ]);
-                setStats(statsRes.data);
-                setRecentUsers(usersRes.data.slice(0, 5));
-                setRecentWorkers(workersRes.data.slice(0, 5));
+                // If we have at least stats, we can stop the initial spinner
+                if (stats || recentUsers.length > 0) setLoading(false);
             } catch (error) {
-                console.error('Fetch dashboard failed', error);
+                if (import.meta.env.DEV) console.error('Fetch dashboard failed', error);
             } finally {
                 setLoading(false);
             }
@@ -125,7 +126,7 @@ const AdminDashboard = () => {
                         </div>
                     </div>
                     <div className="h-[300px] w-full mt-4">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <BarChart data={chartData}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 900 }} />
@@ -150,7 +151,7 @@ const AdminDashboard = () => {
                         <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest">Compositional Analytics</p>
                     </div>
                     <div className="h-[240px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <PieChart>
                                 <Pie data={pieData} innerRadius={80} outerRadius={120} paddingAngle={10} dataKey="value">
                                     <Cell fill="var(--royal-gold)" />

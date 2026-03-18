@@ -35,7 +35,9 @@ const AdminAnalyticsPage = () => {
                 setWorkers(workersRes.data);
                 setBookings(bookingsRes.data);
                 setServiceTypes(serviceRes.data);
-            } catch (e) { console.error(e); } finally { setLoading(false); }
+            } catch (e) { 
+                if (import.meta.env.DEV) console.error(e); 
+            } finally { setLoading(false); }
         };
         fetch();
     }, []);
@@ -108,7 +110,7 @@ const AdminAnalyticsPage = () => {
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <ChartCard title={t('weekly_trend')}>
-                    <ResponsiveContainer width="100%" height={220}>
+                    <ResponsiveContainer width="100%" height={220} minWidth={0}>
                         <BarChart data={weeklyTrend} barSize={28}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                             <XAxis dataKey="day" tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
@@ -121,7 +123,7 @@ const AdminAnalyticsPage = () => {
 
                 <ChartCard title={t('service_breakdown')}>
                     <div className="flex items-center gap-4">
-                        <ResponsiveContainer width="50%" height={200}>
+                        <ResponsiveContainer width="50%" height={200} minWidth={0}>
                             <PieChart>
                                 <Pie data={serviceTypes} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value">
                                     {serviceTypes.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}

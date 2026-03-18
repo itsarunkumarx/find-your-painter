@@ -18,31 +18,31 @@ window.addEventListener('beforeinstallprompt', (e) => {
   window.dispatchEvent(new CustomEvent('pwa-prompt-available'));
 });
 
-// Unregister any stale service workers in dev mode to prevent React duplicate instance crashes.
-// Workbox StaleWhileRevalidate was caching multiple versioned React builds simultaneously.
-if (import.meta.env.DEV) {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
-      for (const reg of registrations) {
-        reg.unregister();
-        console.log('[dev] Unregistered stale service worker:', reg.scope);
-      }
-    });
-  }
-} else {
-  // Production only: register the service worker
-  import('virtual:pwa-register').then(({ registerSW }) => {
-    registerSW({
-      immediate: true,
-      onRegisteredSW(swUrl) {
-        console.log('SW Registered:', swUrl);
-      },
-      onRegisterError(error) {
-        console.warn('SW Registration error:', error);
-      }
-    });
-  });
+// Production performance boost: Disable console logs in non-dev environments
+if (!import.meta.env.DEV) {
+  console.log = () => {};
+  console.debug = () => {};
+  console.info = () => {};
+  // Keep console.warn and console.error for critical visibility
 }
+
+// Register service worker for both dev and production to support push notifications.
+// Note: In vite.config.js, devOptions.enabled: true must also be set.
+import('virtual:pwa-register').then(({ registerSW }) => {
+  if (import.meta.env.DEV) console.log('[SW] Attempting registration via virtual:pwa-register');
+  registerSW({
+    immediate: true,
+    onRegisteredSW(swUrl, registration) {
+      if (import.meta.env.DEV) console.log('[SW] Registered successfully:', swUrl);
+      if (registration && import.meta.env.DEV) console.log('[SW] Registration scope:', registration.scope);
+    },
+    onRegisterError(error) {
+      if (import.meta.env.DEV) console.error('[SW] Registration error:', error);
+    }
+  });
+}).catch(err => {
+  if (import.meta.env.DEV) console.error('[SW] Failed to load virtual:pwa-register:', err);
+});
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

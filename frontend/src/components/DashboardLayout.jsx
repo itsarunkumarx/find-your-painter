@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import DashboardHeader from './DashboardHeader';
 import InstallApp from './InstallApp';
+import BottomNav from './BottomNav';
 
 const DashboardLayout = () => {
     const [isOpen, setIsOpen] = useState(window.innerWidth >= 1024);
@@ -28,13 +29,14 @@ const DashboardLayout = () => {
         <div className="flex min-h-screen bg-[var(--bg-base)] transition-colors duration-500">
             <Sidebar isOpen={isOpen} setIsOpen={setIsOpen} isMobile={isMobile} />
             <main
-                className={`flex-1 transition-all duration-300 ease-in-out ${isMobile ? 'pl-0' : 'pl-[280px]'}`}
+                className={`flex-1 transition-all duration-300 ease-in-out ${isMobile ? 'pl-0 pb-20' : 'pl-[280px]'}`}
             >
                 <div className="p-4 sm:p-8 max-w-7xl mx-auto">
                     <DashboardHeader />
                     <Outlet />
                 </div>
             </main>
+            <BottomNav setIsOpen={setIsOpen} />
             <InstallApp />
         </div>
     );
