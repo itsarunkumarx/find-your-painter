@@ -15,9 +15,11 @@ const AdminUserManagement = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filter, setFilter] = useState('all'); // all, blocked, active, suspended
     const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'danger', title: '', message: '', onConfirm: () => { } });
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     const fetchUsers = async () => {
         if (users.length === 0) setLoading(true);
+        else setIsRefreshing(true);
         try {
             // SWR Integration: Instant delivery from cache
             await fastApi.getWithCache('/admin/users', (data) => {
@@ -27,6 +29,8 @@ const AdminUserManagement = () => {
         } catch (error) {
             if (import.meta.env.DEV) console.error('Fetch users failed', error);
             setLoading(false);
+        } finally {
+            setIsRefreshing(false);
         }
     };
 

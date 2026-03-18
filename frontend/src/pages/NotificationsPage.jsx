@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaBell, FaCheckCircle, FaClock, FaExclamationTriangle, FaTrash, FaCheckDouble } from 'react-icons/fa';
 import { formatDistanceToNow } from 'date-fns';
 import { useSocket } from '../hooks/useSocket';
+import { useTranslation } from 'react-i18next';
+import { useAuth } from '../hooks/useAuth';
 
 const NotificationsPage = () => {
     const { t } = useTranslation();
