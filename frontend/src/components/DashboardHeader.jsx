@@ -35,12 +35,12 @@ const DashboardHeader = () => {
     };
 
     return (
-        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-10 transition-all duration-500">
+        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 transition-all duration-500">
             <div>
                 <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-main)] tracking-tight uppercase">
                     {getPageTitle().split(' ')[0]} <span className="text-royal-gold">{getPageTitle().split(' ').slice(1).join(' ')}</span>
                 </h1>
-                <p className="text-[var(--text-muted)] text-[8px] sm:text-[10px] mt-1 font-black uppercase tracking-[0.3em]">
+                <p className="text-[var(--text-muted)] text-[7px] sm:text-[9px] mt-1 font-black uppercase tracking-[0.3em]">
                     {getSubtitle()}
                 </p>
             </div>

@@ -655,9 +655,9 @@ export const SocketProvider = ({ children }) => {
     useEffect(() => {
         if (!user) return;
 
-        // Use relative URL in development to leverage the Vite proxy (avoids CORS/polling issues)
+        // Explicitly point to the backend port in development to avoid proxy-induced WebSocket connection drops
         const socketUrl = (import.meta.env.DEV) 
-            ? '' 
+            ? 'http://localhost:5000' 
             : (import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL || '').replace(/(\/api)+$/, '');
 
         if (import.meta.env.DEV) console.log('[SOCKET] Initializing with URL:', socketUrl);

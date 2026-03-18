@@ -26,38 +26,43 @@ if (!import.meta.env.DEV) {
   // Keep console.warn and console.error for critical visibility
 }
 
-// Register service worker for both dev and production to support push notifications.
-// Note: In vite.config.js, devOptions.enabled: true must also be set.
-import('virtual:pwa-register').then(({ registerSW }) => {
-  if (import.meta.env.DEV) console.log('[SW] Attempting registration via virtual:pwa-register');
-  registerSW({
-    immediate: true,
-    onRegisteredSW(swUrl, registration) {
-      if (import.meta.env.DEV) console.log('[SW] Registered successfully:', swUrl);
-      if (registration && import.meta.env.DEV) console.log('[SW] Registration scope:', registration.scope);
-    },
-    onRegisterError(error) {
-      if (import.meta.env.DEV) console.error('[SW] Registration error:', error);
-    }
+// Register service worker ONLY in production.
+// In development, we forcefully unregister to prevent HMR/WebSocket interference.
+if (!import.meta.env.DEV) {
+  import('virtual:pwa-register').then(({ registerSW }) => {
+    registerSW({
+      immediate: true,
+    });
+  }).catch(err => {
+    console.error('[SW] Failed to load virtual:pwa-register:', err);
   });
-}).catch(err => {
-  if (import.meta.env.DEV) console.error('[SW] Failed to load virtual:pwa-register:', err);
-});
+} else {
+  // Prevent older Service Workers from hijacking local dev traffic
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister().then((boolean) => {
+          if (boolean) console.log('[SW] Successfully unregistered existing worker for dev stability');
+        });
+      }
+    });
+  }
+}
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ErrorBoundary>
-      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
-        <BrowserRouter>
-          <ThemeProvider>
+    <ThemeProvider>
+      <ErrorBoundary>
+        <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+          <BrowserRouter>
             <AuthProvider>
               <SocketProvider>
                 <App />
               </SocketProvider>
             </AuthProvider>
-          </ThemeProvider>
-        </BrowserRouter>
-      </GoogleOAuthProvider>
-    </ErrorBoundary>
+          </BrowserRouter>
+        </GoogleOAuthProvider>
+      </ErrorBoundary>
+    </ThemeProvider>
   </StrictMode>,
 )

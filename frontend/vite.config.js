@@ -50,7 +50,7 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
       },
       devOptions: {
-        enabled: true, // Allow testing push in dev
+        enabled: false, // Set to false to prevent SW from breaking HMR in dev
         type: 'module'
       }
     })
@@ -67,8 +67,15 @@ export default defineConfig({
             if (id.includes('framer-motion')) {
               return 'vendor-framer';
             }
-            if (id.includes('react') || id.includes('react-router-dom') || id.includes('react-dom')) {
+            if (
+              id.includes('node_modules/react/') || 
+              id.includes('node_modules/react-dom/') || 
+              id.includes('node_modules/scheduler/')
+            ) {
               return 'vendor-react';
+            }
+            if (id.includes('node_modules/react-router') || id.includes('node_modules/react-router-dom')) {
+              return 'vendor-router';
             }
             if (id.includes('recharts') || id.includes('axios') || id.includes('i18next')) {
               return 'vendor-utils';
@@ -80,8 +87,13 @@ export default defineConfig({
     }
   },
   server: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+    },
     hmr: {
       overlay: false, // Disable red error overlay so ErrorBoundary handles errors cleanly
+      host: 'localhost',
+      clientPort: 5173,
     },
     proxy: {
       '/api': 'http://localhost:5000',

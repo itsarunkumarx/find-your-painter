@@ -110,7 +110,17 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-// Cache API calls or other dynamic content if needed
+// Handle Fetch Events - skip WebSockets and Vite internal dev paths
 self.addEventListener('fetch', (event) => {
-    // Custom fetch logic can go here
+    const url = new URL(event.request.url);
+
+    // Skip socket.io, HMR, and Vite internal paths
+    if (
+        url.pathname.includes('socket.io') || 
+        url.pathname.startsWith('/@vite/') || 
+        url.pathname.startsWith('/src/') ||
+        url.pathname.includes('/node_modules/.vite/')
+    ) {
+        return; // Let the browser handle these normally
+    }
 });

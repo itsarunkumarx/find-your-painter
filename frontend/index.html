@@ -15,6 +15,21 @@
   <meta name="apple-mobile-web-app-title" content="Find Your Painter" />
 
   <title>Find Your Painter</title>
+
+  <script>
+    // Forcefully unregister service workers in development to prevent HMR/WebSocket interference
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister().then(function(boolean) {
+              if (boolean) console.log('[KILL-SWITCH] Unregistered Service Worker for Dev Stability');
+            });
+          }
+        });
+      }
+    }
+  </script>
 </head>
 
 <body>

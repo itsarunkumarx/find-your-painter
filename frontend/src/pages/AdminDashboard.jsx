@@ -126,7 +126,7 @@ const AdminDashboard = () => {
                         </div>
                     </div>
                     <div className="h-[300px] w-full mt-4">
-                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={100}>
                             <BarChart data={chartData}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 900 }} />
@@ -151,7 +151,7 @@ const AdminDashboard = () => {
                         <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest">Compositional Analytics</p>
                     </div>
                     <div className="h-[240px] w-full">
-                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={100}>
                             <PieChart>
                                 <Pie data={pieData} innerRadius={80} outerRadius={120} paddingAngle={10} dataKey="value">
                                     <Cell fill="var(--royal-gold)" />

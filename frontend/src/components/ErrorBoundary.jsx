@@ -81,7 +81,7 @@ class ErrorBoundary extends React.Component {
                         </p>
 
                         <button
-                            onClick={handleReload}
+                            onClick={this.handleReload}
                             style={{
                                 background: 'linear-gradient(135deg, #d4af37, #f0d060)',
                                 color: '#000000',

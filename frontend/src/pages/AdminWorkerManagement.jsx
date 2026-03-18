@@ -205,11 +205,11 @@ const AdminWorkerManagement = () => {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-ivory-subtle/30 border-b border-royal-gold/5">
-                                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-navy-deep/40">{t('worker') || 'Worker'}</th>
-                                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-navy-deep/40">{t('location_skills_label')}</th>
-                                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-navy-deep/40">{t('rate_label')}</th>
-                                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-navy-deep/40">{t('verification_label')}</th>
-                                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-navy-deep/40 text-right">{t('actions_label')}</th>
+                                <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-navy-deep/40">{t('worker') || 'Worker'}</th>
+                                <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-navy-deep/40">{t('location_skills_label')}</th>
+                                <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-navy-deep/40">{t('rate_label')}</th>
+                                <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-navy-deep/40">{t('verification_label')}</th>
+                                <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-navy-deep/40 text-center">{t('actions_label')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-royal-gold/5">
@@ -222,7 +222,7 @@ const AdminWorkerManagement = () => {
                                         transition={{ delay: i * 0.03 }}
                                         className="hover:bg-ivory-subtle/20 transition-colors group"
                                     >
-                                        <td className="px-8 py-6">
+                                        <td className="px-6 py-5">
                                             <div className="flex items-center gap-4">
                                                 <img
                                                     src={worker.user?.profileImage || "/assets/premium-avatar.png"}
@@ -230,12 +230,12 @@ const AdminWorkerManagement = () => {
                                                     alt=""
                                                 />
                                                 <div>
-                                                    <p className="text-xs font-black text-navy-deep">{worker.user?.name}</p>
-                                                    <p className="text-[10px] font-bold text-slate-400 lowercase">{worker.user?.email}</p>
+                                                    <p className="text-xs font-black text-navy-deep line-clamp-1">{worker.user?.name}</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 lowercase line-clamp-1">{worker.user?.email}</p>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-8 py-6">
+                                        <td className="px-6 py-5">
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-2 text-[9px] font-black text-navy-deep/60 uppercase tracking-wider">
                                                     <FaMapMarkerAlt className="text-royal-gold" /> {worker.location}
@@ -247,12 +247,12 @@ const AdminWorkerManagement = () => {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-8 py-6">
+                                        <td className="px-6 py-5">
                                             <span className="text-xs font-black text-navy-deep flex items-center gap-1">
                                                 <FaRupeeSign className="text-royal-gold text-[10px]" /> {worker.price}
                                             </span>
                                         </td>
-                                        <td className="px-8 py-6">
+                                        <td className="px-6 py-5">
                                             <div className="flex flex-col gap-1">
                                                 <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest text-center ${worker.verificationStatus === 'approved' ? 'bg-green-50 text-green-500' :
                                                     worker.verificationStatus === 'pending' ? 'bg-royal-gold/10 text-royal-gold' :
@@ -268,48 +268,48 @@ const AdminWorkerManagement = () => {
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="px-8 py-6 text-right">
-                                            <div className="flex items-center justify-end gap-3">
+                                        <td className="px-6 py-5">
+                                            <div className="flex items-center justify-center gap-3">
                                                 <button
                                                     onClick={() => {
                                                         setSelectedWorker(worker);
                                                         setIsReviewModalOpen(true);
                                                     }}
-                                                    className="p-3 bg-royal-gold/10 text-royal-gold rounded-xl hover:bg-royal-gold/20 hover:scale-110 shadow-sm transition-all"
+                                                    className="p-2.5 bg-royal-gold/10 text-royal-gold rounded-xl hover:bg-royal-gold/20 hover:scale-110 shadow-sm transition-all"
                                                     title={t('review_app_tooltip')}
                                                 >
-                                                    <FaIdCard size={14} />
+                                                    <FaIdCard size={13} />
                                                 </button>
 
                                                 {worker.verificationStatus === 'pending' && (
                                                     <div className="flex gap-2">
-                                                        <button onClick={() => verifyWorker(worker._id, 'approved')} className="p-3 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 hover:scale-110 shadow-sm transition-all" title={t('approve_title') || 'Approve'}><FaCheck size={14} /></button>
-                                                        <button onClick={() => verifyWorker(worker._id, 'rejected')} className="p-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 hover:scale-110 shadow-sm transition-all" title={t('reject_title') || 'Reject'}><FaTimes size={14} /></button>
+                                                        <button onClick={() => verifyWorker(worker._id, 'approved')} className="p-2.5 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 hover:scale-110 shadow-sm transition-all" title={t('approve_title') || 'Approve'}><FaCheck size={13} /></button>
+                                                        <button onClick={() => verifyWorker(worker._id, 'rejected')} className="p-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 hover:scale-110 shadow-sm transition-all" title={t('reject_title') || 'Reject'}><FaTimes size={13} /></button>
                                                     </div>
                                                 )}
                                                 
                                                 <button
                                                     onClick={() => toggleSuspend(worker)}
-                                                    className={`p-3 rounded-xl transition-all shadow-sm ${worker.user?.isSuspended ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'
+                                                    className={`p-2.5 rounded-xl transition-all shadow-sm ${worker.user?.isSuspended ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'
                                                         }`}
                                                     title={worker.user?.isSuspended ? t('unsuspend_user_tooltip') : t('suspend_user_tooltip')}
                                                 >
-                                                    <FaUserTimes size={14} />
+                                                    <FaUserTimes size={13} />
                                                 </button>
                                                 <button
                                                     onClick={() => toggleBlock(worker)}
-                                                    className={`p-3 rounded-xl transition-all shadow-sm ${worker.user?.isBlocked ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-red-50 text-red-600 hover:bg-red-100'
+                                                    className={`p-2.5 rounded-xl transition-all shadow-sm ${worker.user?.isBlocked ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-red-50 text-red-600 hover:bg-red-100'
                                                         }`}
                                                     title={worker.user?.isBlocked ? t('unblock_user_tooltip') : t('block_user_tooltip')}
                                                 >
-                                                    {worker.user?.isBlocked ? <FaUserCheck size={14} /> : <FaUserSlash size={14} />}
+                                                    {worker.user?.isBlocked ? <FaUserCheck size={13} /> : <FaUserSlash size={13} />}
                                                 </button>
                                                 <button
                                                     onClick={() => handleDeleteWorker(worker)}
-                                                    className="p-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 hover:scale-110 shadow-sm transition-all"
+                                                    className="p-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 hover:scale-110 shadow-sm transition-all"
                                                     title={t('delete_user_tooltip')}
                                                 >
-                                                    <FaTrash size={14} />
+                                                    <FaTrash size={13} />
                                                 </button>
                                             </div>
                                         </td>
