@@ -2,10 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import safeStorage from '../utils/safeStorage';
 import { FaShieldAlt, FaHome, FaCity, FaUserFriends, FaPaintRoller, FaGlobe, FaChevronDown, FaCheck, FaAndroid, FaDownload, FaApple } from 'react-icons/fa';
 import useDeviceDetect from '../hooks/useDeviceDetect';
+import { useAuth } from '../hooks/useAuth';
 
 const languages = [
     { code: 'en', label: 'English', flag: '🇬🇧' },
@@ -28,10 +29,18 @@ const StatCard = ({ icon: Icon, value, label }) => (
 const EntryPage = () => {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [langOpen, setLangOpen] = useState(false);
     const [deferredPrompt, setDeferredPrompt] = useState(window.deferredPrompt);
     const langRef = useRef(null);
     const { isAndroid, isIOS, isDesktop, isStandalone } = useDeviceDetect();
+
+    // Auto-redirect logged-in users to their dashboard
+    if (user) {
+        if (user.role === 'admin') return <Navigate to="/admin-dashboard" replace />;
+        if (user.role === 'worker') return <Navigate to="/worker-dashboard" replace />;
+        return <Navigate to="/user-dashboard" replace />;
+    }
 
 
     useEffect(() => {

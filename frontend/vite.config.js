@@ -20,28 +20,35 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: false,
       manifest: {
-        theme_color: '#ffffff',
+        name: 'Find Your Painter',
+        short_name: 'FYPainter',
+        description: 'Find and connect with verified professional painters near you.',
+        theme_color: '#1a1a2e',
         display: 'standalone',
-        appleMobileWebAppCapable: 'no', // Disable deprecated tag injection
-        background_color: '#ffffff',
+        background_color: '#1a1a2e',
         start_url: '/',
+        scope: '/',
         id: '/',
+        orientation: 'portrait-primary',
+        categories: ['utilities', 'lifestyle'],
         icons: [
           {
             src: 'icons/icon-192.png',
             sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'icons/icon-512.png',
-            sizes: '512x512',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any'
           },
           {
             src: 'icons/icon-512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any'
+          },
+          {
+            src: 'icons/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
           }
         ]
       },

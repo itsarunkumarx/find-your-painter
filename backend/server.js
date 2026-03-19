@@ -442,6 +442,20 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 5000;
+
+// ─── Global Express Error Handler ────────────────────────────────────────────
+// Must be declared AFTER all routes. Catches any error passed to next(err).
+app.use((err, req, res, next) => {
+    if (process.env.NODE_ENV !== 'production') {
+        console.error('[Global Error]', err.stack || err.message);
+    }
+    const statusCode = err.statusCode || err.status || 500;
+    res.status(statusCode).json({
+        message: err.message || 'Internal Server Error',
+        ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+    });
+});
+
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 
@@ -450,7 +464,6 @@ server.listen(PORT, () => {
     if (process.env.NODE_ENV === 'production' || process.env.BACKEND_URL) {
         setInterval(() => {
             fetch(url)
-                // .then(() => console.log(`Self-ping successful: ${url}`))
                 .catch(err => console.error(`Self-ping failed: ${err.message}`));
         }, 14 * 60 * 1000); // Ping every 14 minutes
     }

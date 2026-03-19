@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import DashboardLayout from './components/DashboardLayout';
 // Removed duplicate IncomingCallModal import
 import Navbar from './components/Navbar';
+import OfflineBanner from './components/OfflineBanner';
 import { WorkerProvider } from './context/WorkerContext';
 import { Toaster } from 'react-hot-toast';
 
@@ -110,6 +111,7 @@ const App = () => {
   return (
     <>
       <Toaster position="top-center" reverseOrder={false} />
+      <OfflineBanner />
       {/* Removed duplicate IncomingCallModal — handled by SocketContext */}
       <div className="flex min-h-screen">
         {!isDashboard && <Navbar />}

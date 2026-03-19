@@ -1,3 +1,21 @@
+# ─── Dependencies ────────────────────────────────────────────────────────────
 node_modules/
+
+# ─── Environment (secrets — never commit) ────────────────────────────────────
 .env
+.env.*
+!.env.example
+
+# ─── User Uploads (store on Cloudinary in prod) ───────────────────────────────
+uploads/*
+!uploads/.gitkeep
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+
+# ─── Misc ────────────────────────────────────────────────────────────────────
 vapid.txt
+.DS_Store
+Thumbs.db

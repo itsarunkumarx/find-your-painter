@@ -1,11 +1,20 @@
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { FaUser, FaPaintRoller, FaUserShield } from 'react-icons/fa';
+import { useAuth } from '../hooks/useAuth';
 
 const RoleSelection = () => {
     const navigate = useNavigate();
     const { t } = useTranslation();
+    const { user } = useAuth();
+
+    // Auto-redirect if already authenticated
+    if (user) {
+        if (user.role === 'admin') return <Navigate to="/admin-dashboard" replace />;
+        if (user.role === 'worker') return <Navigate to="/worker-dashboard" replace />;
+        return <Navigate to="/user-dashboard" replace />;
+    }
 
     const roles = [
         {

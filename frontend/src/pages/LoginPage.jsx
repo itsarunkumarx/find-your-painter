@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { motion } from 'framer-motion';
 import { FaGoogle } from 'react-icons/fa';
@@ -8,9 +8,16 @@ import { useGoogleLogin } from '@react-oauth/google';
 
 const LoginPage = () => {
     const { role } = useParams();
-    const { login, googleLogin } = useAuth();
+    const { login, googleLogin, user } = useAuth();
     const navigate = useNavigate();
     const { t } = useTranslation();
+
+    // Auto-redirect if already authenticated
+    if (user) {
+        if (user.role === 'admin') return <Navigate to="/admin-dashboard" replace />;
+        if (user.role === 'worker') return <Navigate to="/worker-dashboard" replace />;
+        return <Navigate to="/user-dashboard" replace />;
+    }
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');

@@ -577,10 +577,14 @@ export const SocketProvider = ({ children }) => {
             let message = 'Camera/Microphone access denied.';
             if (!window.isSecureContext) {
                 message = '🎙️ Browser Error: WebRTC requires a secure context (HTTPS). Media blocked.';
-            } else if (err.name === 'NotAllowedError') {
+            } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
                 message = '🎙️ Access Denied: Please allow Camera/Microphone in your browser settings (🔒 lock icon).';
             } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
                 message = '📵 Hardware Error: No camera or microphone detected.';
+            } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+                message = '📵 Device Busy: Camera or Microphone is already in use by another app.';
+            } else if (err.name === 'OverconstrainedError') {
+                message = '⚠️ Hardware Mismatch: Your device does not support the requested media quality.';
             }
 
             const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
