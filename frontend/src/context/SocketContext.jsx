@@ -121,6 +121,8 @@ export const SocketProvider = ({ children }) => {
     const preWarmedStreamRef = useRef(null);
     // Buffers remote tracks that arrive BEFORE setActiveCall completes (React async state race)
     const pendingRemoteStreamRef = useRef(null);
+    // Tracks if the user has permanently denied mic/camera permission this session
+    const permissionDeniedRef = useRef(false);
 
     // CRITICAL FIX: useRef(() => {...}) stores the function as .current, NOT the return value.
     // Must immediately invoke the function: useRef((() => {...})())
@@ -254,8 +256,40 @@ export const SocketProvider = ({ children }) => {
         });
     }, []);
 
+    // Check browser permission state BEFORE calling getUserMedia to give a proactive warning
+    const checkPermission = useCallback(async (callType) => {
+        if (!navigator.permissions) {
+            // Permissions API not available — always allow getUserMedia to decide
+            permissionDeniedRef.current = false;
+            return true;
+        }
+        try {
+            const micPerm = await navigator.permissions.query({ name: 'microphone' });
+            if (micPerm.state === 'denied') {
+                permissionDeniedRef.current = true;
+                return false;
+            }
+            if (callType === 'video') {
+                const camPerm = await navigator.permissions.query({ name: 'camera' });
+                if (camPerm.state === 'denied') {
+                    permissionDeniedRef.current = true;
+                    return false;
+                }
+            }
+            // FIX: If we reach here, permission is either 'granted' or 'prompt'.
+            // Reset the denied flag so a previously-failed pre-warm doesn't block future calls.
+            permissionDeniedRef.current = false;
+        } catch {
+            // Permissions API may throw on some browsers (e.g. Capacitor WebView) — fall through
+            permissionDeniedRef.current = false;
+        }
+        return true;
+    }, []);
+
     const preWarmMedia = useCallback(async (callType) => {
         if (preWarmedStreamRef.current) return preWarmedStreamRef.current;
+        // FIX: Do NOT block pre-warm based on permissionDeniedRef — it may be stale.
+        // Pre-warm is best-effort; if it fails, the real getUserMedia in startCall/acceptCall will run.
         try {
             const constraints = {
                 audio: {
@@ -274,10 +308,16 @@ export const SocketProvider = ({ children }) => {
             };
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
             preWarmedStreamRef.current = stream;
+            permissionDeniedRef.current = false; // Confirmed granted — reset
             return stream;
         } catch (err) {
+            // FIX: Only mark as denied for hard 'NotAllowedError'. For other errors (NotFoundError,
+            // NotReadableError), don't permanently block — the device may become available later.
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                permissionDeniedRef.current = true;
+            }
             if (import.meta.env.DEV) console.warn('[PreWarm] Failed to pre-warm media:', err.name);
-            return null;
+            return null; // Pre-warm is best-effort; startCall/acceptCall will handle the real request
         }
     }, []);
 
@@ -430,6 +470,20 @@ export const SocketProvider = ({ children }) => {
             return;
         }
 
+        // FIX: Check permission BEFORE showing any UI or playing ringtone.
+        // This catches the "permanently denied" case and avoids a confusing partial-UI state.
+        const hasPermission = await checkPermission(callType);
+        if (!hasPermission) {
+            const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+            toast.error(
+                isMobile
+                    ? '📵 Camera/Mic blocked! Go to Phone Settings → App Permissions → allow Camera & Microphone for this browser.'
+                    : '🎙️ Microphone/Camera access is blocked. Click the 🔒 lock icon in your browser address bar and allow mic & camera, then refresh.',
+                { duration: 8000, id: 'media-denied' }
+            );
+            return;
+        }
+
         setCallStatus('connecting');
         stopRingtone();
         
@@ -450,28 +504,24 @@ export const SocketProvider = ({ children }) => {
 
         // Parallelize media capture and peer initialization
         const mediaPromise = (async () => {
-            try {
-                const constraints = {
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true,
-                        sampleRate: 48000,
-                        channelCount: 2,
-                        googEchoCancellation: true,
-                        googAutoGainControl: true,
-                        googNoiseSuppression: true,
-                        googHighpassFilter: true,
-                        googTypingNoiseDetection: true
-                    },
-                    video: callType === 'video' ? { facingMode: 'user' } : false
-                };
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                setActiveCall(prev => prev ? { ...prev, stream } : prev);
-                return stream;
-            } catch (err) {
-                throw err;
-            }
+            const constraints = {
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: 48000,
+                    channelCount: 2,
+                    googEchoCancellation: true,
+                    googAutoGainControl: true,
+                    googNoiseSuppression: true,
+                    googHighpassFilter: true,
+                    googTypingNoiseDetection: true
+                },
+                video: callType === 'video' ? { facingMode: 'user' } : false
+            };
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            setActiveCall(prev => prev ? { ...prev, stream } : prev);
+            return stream;
         })();
 
         try {
@@ -491,26 +541,42 @@ export const SocketProvider = ({ children }) => {
                 callType,
                 offer: mungedOffer
             });
+
+            // FIX: Only register the no-answer timeout AFTER the offer is successfully sent.
+            // Previously this ran even when media failed, causing a phantom hangUp() 120s later.
+            if (callTimerRef.current) clearTimeout(callTimerRef.current);
+            callTimerRef.current = setTimeout(() => {
+                if (activeCallRef.current && !activeCallRef.current.remoteStream) {
+                    setCallStatus('no_answer');
+                    setTimeout(() => hangUp(), 4000);
+                }
+            }, 120000);
+
         } catch (err) {
             stopRingtone();
             setCallStatus(null);
             if (activeCallRef.current?.stream) activeCallRef.current.stream.getTracks().forEach(t => t.stop());
             setActiveCall(null);
-            // ... (rest of error handling remains same)
             if (socketRef.current) socketRef.current.emit('call_cancel', { toUserId, reason: 'caller_media_denied' });
-            // Simplified error toast
-            toast.error('Media access failed. Please check permissions.', { id: 'media-fail' });
-        }
 
-        // Timeout
-        if (callTimerRef.current) clearTimeout(callTimerRef.current);
-        callTimerRef.current = setTimeout(() => {
-            if (activeCallRef.current && !activeCallRef.current.remoteStream) {
-                setCallStatus('no_answer');
-                setTimeout(() => hangUp(), 4000);
+            // Mark permission as denied if that's the cause
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                permissionDeniedRef.current = true;
             }
-        }, 120000);
-    }, [user, createPeer, stopRingtone, hangUp, resolveUserId, getRingtoneUrl]);
+
+            let message = '🎙️ Media access failed. Please check mic/camera permissions.';
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                message = '🎙️ Access Denied: Click the 🔒 lock icon in your browser address bar and allow Microphone & Camera.';
+            } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                message = '📵 No camera or microphone detected on this device.';
+            } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+                message = '📵 Camera/Microphone is already in use by another app. Close it and try again.';
+            }
+            toast.error(message, { duration: 8000, id: 'media-fail' });
+            // FIX: return early — do NOT fall through to set the timeout after failure
+            return;
+        }
+    }, [user, createPeer, stopRingtone, hangUp, resolveUserId, getRingtoneUrl, checkPermission]);
 
     // Call transfer — forward active call to another user
     const transferCall = useCallback((toUserId) => {
@@ -534,6 +600,25 @@ export const SocketProvider = ({ children }) => {
         if (!incomingCall || !socketRef.current) return;
         
         const { fromUserId, fromUserName, fromUserImage, callType, offer, callId } = incomingCall;
+
+        // FIX: Always do a LIVE permission check instead of relying on the potentially stale
+        // permissionDeniedRef (which may have been set by a background preWarmMedia failure
+        // even when the user has since granted permission).
+        // Only block if the permission is ACTUALLY 'denied' right now, not just historically.
+        if (!preWarmedStreamRef.current) {
+            const hasPermission = await checkPermission(callType);
+            if (!hasPermission) {
+                const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+                toast.error(
+                    isMobile
+                        ? '📵 Camera/Mic blocked! Go to Phone Settings → App Permissions → allow Camera & Microphone for this browser.'
+                        : '🎙️ Access Denied: Click the 🔒 lock icon in your browser address bar and allow Microphone & Camera, then refresh.',
+                    { duration: 8000, id: 'media-denied' }
+                );
+                socketRef.current.emit('call_reject', { toUserId: fromUserId, reason: 'media_denied' });
+                return;
+            }
+        }
 
         // INSTANT UI: Clear incoming call state and set active call immediately
         setIncomingCall(null);
@@ -571,20 +656,26 @@ export const SocketProvider = ({ children }) => {
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
             }
             preWarmedStreamRef.current = null; // Consume pre-warmed stream
+            permissionDeniedRef.current = false; // Reset flag — user granted access
         } catch (err) {
             if (import.meta.env.DEV) console.error('[acceptCall] getUserMedia failed:', err);
+
+            // Mark as denied so the next call attempt shows the error immediately
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                permissionDeniedRef.current = true;
+            }
             
-            let message = 'Camera/Microphone access denied.';
+            let message = '🎙️ Camera/Microphone access denied.';
             if (!window.isSecureContext) {
-                message = '🎙️ Browser Error: WebRTC requires a secure context (HTTPS). Media blocked.';
+                message = '🎙️ Browser Error: WebRTC requires HTTPS. Media is blocked on insecure pages.';
             } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                message = '🎙️ Access Denied: Please allow Camera/Microphone in your browser settings (🔒 lock icon).';
+                message = '🎙️ Access Denied: Click the 🔒 lock icon in your browser address bar and allow Microphone & Camera.';
             } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-                message = '📵 Hardware Error: No camera or microphone detected.';
+                message = '📵 No camera or microphone detected on this device.';
             } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-                message = '📵 Device Busy: Camera or Microphone is already in use by another app.';
+                message = '📵 Camera/Microphone is already in use by another app. Close it and try again.';
             } else if (err.name === 'OverconstrainedError') {
-                message = '⚠️ Hardware Mismatch: Your device does not support the requested media quality.';
+                message = '⚠️ Your device does not support the required media quality settings.';
             }
 
             const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
@@ -595,6 +686,8 @@ export const SocketProvider = ({ children }) => {
                 { duration: 8000, id: 'media-denied' }
             );
             socketRef.current.emit('call_reject', { toUserId: fromUserId, reason: 'media_denied' });
+            // Also tear down the active call overlay we already set
+            setActiveCall(null);
             return;
         }
 
@@ -625,7 +718,7 @@ export const SocketProvider = ({ children }) => {
             if (stream) stream.getTracks().forEach(t => t.stop());
             socketRef.current.emit('call_end', { toUserId: fromUserId });
         }
-    }, [incomingCall, createPeer, stopRingtone, drainIceCandidates]);
+    }, [incomingCall, createPeer, stopRingtone, drainIceCandidates, checkPermission]);
 
     const rejectCall = useCallback(() => {
         if (!incomingCall || !socketRef.current) return;
