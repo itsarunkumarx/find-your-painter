@@ -54,7 +54,7 @@ const io = new Server(server, {
 });
 console.log('[SOCKET_INIT] Allowing origins:', allowedOrigins);
 
-app.use(cors({
+const corsOptions = {
     origin: (origin, callback) => {
         // Allow requests with no origin (like mobile apps or curl) 
         // OR origins that match our allowed list
@@ -69,9 +69,11 @@ app.use(cors({
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
     exposedHeaders: ['Set-Cookie']
-}));
+};
+
+app.use(cors(corsOptions));
 // Explicitly handle OPTIONS preflight
-app.options('*', cors());
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
