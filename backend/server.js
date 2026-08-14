@@ -37,13 +37,24 @@ const allowedOrigins = [
     (process.env.FRONTEND_URL || '').trim(),
     'https://find-your-painter.vercel.app', // Explicit production URL
     'http://localhost:5173',
-    'http://127.0.0.1:5173'
+    'http://127.0.0.1:5173',
+    'https://localhost',
+    'http://localhost',
+    'capacitor://localhost',
+    'ionic://localhost'
 ].filter(Boolean);
+
+const isOriginAllowed = (origin) => {
+    if (!origin) return true; // Mobile apps, Postman, curl
+    if (allowedOrigins.some(o => origin.startsWith(o))) return true;
+    if (origin.startsWith('capacitor://') || origin.startsWith('ionic://') || origin.includes('localhost') || origin.includes('127.0.0.1')) return true;
+    return false;
+};
 
 const io = new Server(server, {
     cors: {
         origin: (origin, callback) => {
-            if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
+            if (isOriginAllowed(origin)) {
                 callback(null, true);
             } else {
                 callback(null, false);
@@ -56,13 +67,11 @@ console.log('[SOCKET_INIT] Allowing origins:', allowedOrigins);
 
 const corsOptions = {
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl) 
-        // OR origins that match our allowed list
-        if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
+        if (isOriginAllowed(origin)) {
             callback(null, true);
         } else {
             console.warn(`[CORS] Rejected origin: ${origin}`);
-            callback(null, false); // Don't throw error, just disallow
+            callback(null, false);
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
