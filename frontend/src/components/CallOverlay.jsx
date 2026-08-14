@@ -20,33 +20,31 @@ const CallOverlay = ({ call, status, onHangUp, onToggleMute, onToggleVideo, isMu
         if (!stream) return;
         console.log('[CallOverlay] Attaching stream:', stream.id, 'Tracks:', stream.getTracks().length);
 
-        if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== stream) {
+        if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = stream;
-            remoteVideoRef.current.play().catch(() => {});
+            remoteVideoRef.current.muted = false;
+            remoteVideoRef.current.volume = 1.0;
+            remoteVideoRef.current.play().then(() => {
+                setAudioUnlocked(true);
+                setAudioError(false);
+            }).catch((err) => {
+                console.warn('[CallOverlay] Video autoplay:', err.name);
+                if (err.name === 'NotAllowedError') setAudioError(true);
+            });
         }
 
-        if (remoteAudioRef.current && remoteAudioRef.current.srcObject !== stream) {
+        if (remoteAudioRef.current) {
             remoteAudioRef.current.srcObject = stream;
             remoteAudioRef.current.volume = 1.0;
             remoteAudioRef.current.muted = false;
-
-            let attempts = 0;
-            const tryPlay = async () => {
-                if (!remoteAudioRef.current) return;
-                attempts++;
-                try {
-                    await remoteAudioRef.current.play();
-                    setAudioUnlocked(true);
-                    setAudioError(false);
-                } catch (err) {
-                    if (err.name === 'NotAllowedError') {
-                        setAudioError(true);
-                    } else if (attempts < 10) {
-                        playAttemptRef.current = setTimeout(tryPlay, 500);
-                    }
+            remoteAudioRef.current.play().then(() => {
+                setAudioUnlocked(true);
+                setAudioError(false);
+            }).catch((err) => {
+                if (err.name === 'NotAllowedError') {
+                    setAudioError(true);
                 }
-            };
-            await tryPlay();
+            });
         }
     }, []);
 
@@ -219,7 +217,6 @@ const CallOverlay = ({ call, status, onHangUp, onToggleMute, onToggleVideo, isMu
                                 ref={remoteVideoRef}
                                 autoPlay
                                 playsInline
-                                muted
                                 className="w-full h-3/5 sm:h-full object-cover"
                             />
 

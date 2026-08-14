@@ -447,7 +447,7 @@ export const SocketProvider = ({ children }) => {
         // FIX: Remote tracks can arrive BEFORE setActiveCall(). Store them in a ref buffer first.
         // When setActiveCall runs, it picks up the pending stream.
         peer.ontrack = (event) => {
-            if (import.meta.env.DEV) console.log('[WebRTC] ontrack:', event.track.kind);
+            if (import.meta.env.DEV) console.log('[WebRTC] ontrack received:', event.track.kind, event.track.id);
 
             if (!pendingRemoteStreamRef.current) {
                 pendingRemoteStreamRef.current = new MediaStream();
@@ -458,10 +458,11 @@ export const SocketProvider = ({ children }) => {
                 pendingStream.addTrack(event.track);
             }
 
+            // Create a fresh MediaStream reference with all tracks so React detects the update and plays immediately
+            const updatedStream = new MediaStream(pendingStream.getTracks());
             setActiveCall(prev => {
                 if (!prev) return prev;
-                if (prev.remoteStream && prev.remoteStream.getTracks().length > 0) return prev;
-                return { ...prev, remoteStream: pendingStream };
+                return { ...prev, remoteStream: updatedStream };
             });
         };
 

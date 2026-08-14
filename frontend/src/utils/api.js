@@ -27,6 +27,10 @@ api.interceptors.request.use((config) => {
         config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
+}, (error) => {
+    return Promise.reject(error);
+});
+
 // Add a response interceptor to handle stale/deleted session tokens
 api.interceptors.response.use(
     (response) => response,
