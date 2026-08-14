@@ -27,8 +27,16 @@ api.interceptors.request.use((config) => {
         config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
-}, (error) => {
-    return Promise.reject(error);
-});
+// Add a response interceptor to handle stale/deleted session tokens
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401 && error.response?.data?.message?.includes('not found')) {
+            safeStorage.removeItem('token');
+            safeStorage.removeItem('user');
+        }
+        return Promise.reject(error);
+    }
+);
 
 export default api;
