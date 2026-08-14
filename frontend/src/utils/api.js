@@ -1,7 +1,8 @@
 import axios from 'axios';
 import safeStorage from './safeStorage';
 
-const rawBaseURL = import.meta.env.VITE_API_URL || '';
+const isNativeMobile = typeof window !== 'undefined' && (window.Capacitor?.isNativePlatform?.() || window.location.protocol === 'capacitor:');
+const rawBaseURL = import.meta.env.VITE_API_URL || (isNativeMobile ? 'https://find-your-painter.onrender.com' : '');
 // Aggressively remove any trailing slashes and any number of /api suffixes, then add exactly one.
 const cleanBaseURL = `${rawBaseURL.replace(/\/+$/, '').replace(/(\/api)+$/, '')}/api`;
 

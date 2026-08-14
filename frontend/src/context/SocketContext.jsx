@@ -828,9 +828,10 @@ export const SocketProvider = ({ children }) => {
         if (!user) return;
 
         // Explicitly point to the backend port in development to avoid proxy-induced WebSocket connection drops
+        const isNativeMobile = typeof window !== 'undefined' && (window.Capacitor?.isNativePlatform?.() || window.location.protocol === 'capacitor:');
         const socketUrl = (import.meta.env.DEV) 
             ? 'http://localhost:5000' 
-            : (import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL || '').replace(/(\/api)+$/, '');
+            : (import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL || (isNativeMobile ? 'https://find-your-painter.onrender.com' : '')).replace(/(\/api)+$/, '');
 
         if (import.meta.env.DEV) console.log('[SOCKET] Initializing with URL:', socketUrl);
         const socket = io(socketUrl, {
