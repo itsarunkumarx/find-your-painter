@@ -12,7 +12,10 @@ const WorkerCard = ({ worker }) => {
     const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
     const [isInitiating, setIsInitiating] = useState(false);
 
-    if (!worker || !worker.user) return null;
+    if (!worker) return null;
+
+    const displayName = worker.fullName || worker.user?.name || 'Verified Painter';
+    const displayImage = worker.user?.profileImage || worker.profileImage || "/assets/premium-avatar.png";
 
     return (
         <>
@@ -33,8 +36,8 @@ const WorkerCard = ({ worker }) => {
                         <div className="absolute -inset-1 bg-gradient-to-b from-yellow-500/20 to-slate-200/20 rounded-full blur-[2px] opacity-40 group-hover/img:opacity-100 transition duration-1000"></div>
                         <img
                             className="relative w-14 h-14 sm:w-20 sm:h-20 rounded-full border-2 border-royal-gold/30 object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-700"
-                            src={worker.user?.profileImage || "/assets/premium-avatar.png"}
-                            alt={worker.user?.name}
+                            src={displayImage}
+                            alt={displayName}
                             loading="lazy"
                         />
                         {worker.isVerified && (
@@ -45,7 +48,7 @@ const WorkerCard = ({ worker }) => {
                     </div>
                     <div className="flex-1 min-w-0">
                         <h3 className="text-lg sm:text-2xl font-black text-[var(--text-main)] tracking-tight truncate group-hover:text-royal-gold transition-colors duration-500">
-                            {worker.user?.name}
+                            {displayName}
                         </h3>
                         <div className="flex items-center gap-2 mt-1 sm:mt-2">
                             <div className="flex items-center gap-1 text-royal-gold">

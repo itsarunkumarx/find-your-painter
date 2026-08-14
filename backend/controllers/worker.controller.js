@@ -62,12 +62,22 @@ export const applyToBecomeWorker = async (req, res) => {
             return res.status(400).json({ message: 'Application already exists' });
         }
 
+        let parsedSkills = req.body.skills;
+        if (typeof parsedSkills === 'string') {
+            try {
+                const parsed = JSON.parse(parsedSkills);
+                parsedSkills = Array.isArray(parsed) ? parsed : [parsed];
+            } catch (e) {
+                parsedSkills = parsedSkills.split(',').map(s => s.trim()).filter(Boolean);
+            }
+        }
+
         const worker = await Worker.create({
             user: req.user._id,
             fullName: req.body.fullName,
             applicationEmail: req.body.applicationEmail,
             applicationPhone: req.body.applicationPhone,
-            skills: req.body.skills,
+            skills: parsedSkills,
             experience: req.body.experience,
             location: req.body.location,
             price: req.body.price,

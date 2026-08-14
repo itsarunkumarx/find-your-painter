@@ -49,13 +49,16 @@ const ExplorePainters = () => {
         return () => clearInterval(interval);
     }, []);
 
-    const filteredWorkers = (workers || []).filter(w =>
-        ((w.user?.name?.toLowerCase() || '').includes(search.toLowerCase()) ||
-            (w.location?.toLowerCase() || '').includes(search.toLowerCase())) &&
-        (filterSkill === '' || (w.skills || []).includes(filterSkill)) &&
-        (w.price <= priceRange) &&
-        (w.rating >= minRating)
-    );
+    const filteredWorkers = (workers || []).filter(w => {
+        const name = (w.fullName || w.user?.name || '').toLowerCase();
+        const loc = (w.location || '').toLowerCase();
+        const q = search.toLowerCase();
+        const matchesQuery = name.includes(q) || loc.includes(q);
+        const matchesSkill = filterSkill === '' || (w.skills || []).some(s => s.toLowerCase().includes(filterSkill.toLowerCase()));
+        const matchesPrice = !priceRange || (w.price <= priceRange);
+        const matchesRating = (w.rating || 0) >= minRating;
+        return matchesQuery && matchesSkill && matchesPrice && matchesRating;
+    });
 
     const toggleCompare = (worker) => {
         if (compareList.find(c => c._id === worker._id)) {
