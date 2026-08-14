@@ -4,28 +4,17 @@ import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import path from 'path';
 import fs from 'fs';
 
-// Cloudinary Configuration (will use env vars)
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-});
+// Check if valid Cloudinary credentials are provided (ignoring template placeholders)
+const isCloudinaryConfigured = Boolean(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    !process.env.CLOUDINARY_CLOUD_NAME.toUpperCase().includes('YOUR_') &&
+    process.env.CLOUDINARY_API_KEY &&
+    !process.env.CLOUDINARY_API_KEY.toUpperCase().includes('YOUR_') &&
+    process.env.CLOUDINARY_API_SECRET &&
+    !process.env.CLOUDINARY_API_SECRET.toUpperCase().includes('YOUR_')
+);
 
-// Configure Cloudinary Storage
-const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: async (req, file) => {
-        return {
-            folder: 'find-your-painter',
-            allowed_formats: ['jpg', 'png', 'jpeg', 'pdf'],
-            public_id: file.fieldname + '-' + Date.now(),
-            // Ensure PDFs are treated correctly
-            resource_type: 'auto'
-        };
-    },
-});
-
-// Fallback Local Storage (for emergency/dev if Cloudinary not set)
+// Fallback Local Storage (for local dev or if Cloudinary is unconfigured)
 const diskStorage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = 'uploads/';
@@ -40,8 +29,30 @@ const diskStorage = multer.diskStorage({
     }
 });
 
-// Use Cloudinary if configured, otherwise fallback to local disk
-const finalStorage = (process.env.CLOUDINARY_CLOUD_NAME) ? storage : diskStorage;
+let finalStorage = diskStorage;
+
+if (isCloudinaryConfigured) {
+    try {
+        cloudinary.config({
+            cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+            api_key: process.env.CLOUDINARY_API_KEY,
+            api_secret: process.env.CLOUDINARY_API_SECRET
+        });
+
+        finalStorage = new CloudinaryStorage({
+            cloudinary: cloudinary,
+            params: async (req, file) => ({
+                folder: 'find-your-painter',
+                allowed_formats: ['jpg', 'png', 'jpeg', 'pdf'],
+                public_id: file.fieldname + '-' + Date.now(),
+                resource_type: 'auto'
+            }),
+        });
+    } catch (err) {
+        console.warn('[UPLOAD] Cloudinary init failed, falling back to diskStorage:', err.message);
+        finalStorage = diskStorage;
+    }
+}
 
 const fileFilter = (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|pdf/;
@@ -62,3 +73,4 @@ const upload = multer({
 });
 
 export default upload;
+
