@@ -23,21 +23,27 @@ export const createBooking = async (req, res) => {
             .populate('user', 'name')
             .populate('worker');
 
-        // Notify Worker
-        await createNotification({
-            user: populatedBooking.worker.user,
-            type: 'booking_new',
-            title: 'New Booking Request',
-            message: `${populatedBooking.user.name} has requested a new service: ${serviceType}`,
-            link: '/worker-jobs',
-            icon: '🎨',
-            io: req.io
-        });
+        // Safely notify Worker if user reference is present
+        const workerUserId = populatedBooking?.worker?.user?._id || populatedBooking?.worker?.user;
+        if (workerUserId) {
+            try {
+                await createNotification({
+                    user: workerUserId,
+                    type: 'booking_new',
+                    title: 'New Booking Request',
+                    message: `${populatedBooking.user?.name || 'A Client'} has requested a new service: ${serviceType}`,
+                    link: '/worker-jobs',
+                    icon: '🎨',
+                    io: req.io
+                });
+            } catch (notifyErr) {
+                console.warn('Booking notification error:', notifyErr.message);
+            }
+        }
 
         // Emit socket event if io is attached to req
         if (req.io) {
             req.io.emit('new_booking', populatedBooking);
-            // In a real app, emit to specific worker room: req.io.to(workerId).emit(...)
         }
 
         res.status(201).json(booking);

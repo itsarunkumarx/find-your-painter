@@ -13,7 +13,7 @@ const bookingSchema = new mongoose.Schema({
         enum: ['not_started', 'started', 'in_progress', 'completed'],
         default: 'not_started'
     },
-    serviceType: { type: String, enum: ['Interior', 'Exterior', 'Commercial'], required: true },
+    serviceType: { type: String, default: 'Interior Painting', required: true },
     location: { type: String, required: true },
     paymentMethod: {
         type: String,

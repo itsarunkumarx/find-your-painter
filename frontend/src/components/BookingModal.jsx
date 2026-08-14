@@ -38,8 +38,9 @@ const BookingModal = ({ isOpen, onClose, worker }) => {
             setCreatedBooking(data);
             setIsSuccess(true);
         } catch (error) {
-            console.error("Booking error:", error.response?.data || error.message);
-            toast.error(t('booking_failed'));
+            const errorMsg = error.response?.data?.message || t('booking_failed');
+            console.error("Booking error:", errorMsg);
+            toast.error(errorMsg);
         } finally {
             setLoading(false);
         }
