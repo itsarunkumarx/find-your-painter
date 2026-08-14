@@ -41,6 +41,7 @@ frontend/android/app/build/
 frontend/android/local.properties
 frontend/android/.idea/
 *.apk
+!frontend/public/FindYourPainter.apk
 *.aab
 *.keystore
 *.jks
