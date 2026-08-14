@@ -21,15 +21,12 @@ const ExplorePainters = () => {
     const navigate = useNavigate();
 
     const fetchWorkers = async (showLoading = true) => {
-        // Only show full loading if we have NO workers yet
         if (showLoading && !workers.length) setLoading(true);
         else if (!showLoading) setIsRefreshing(true);
         
         try {
-            await fastApi.getWithCache('/workers', (data, isCached) => {
-                setWorkers(data || []);
-                if (isCached && loading) setLoading(false);
-            }, { forceRefresh: !showLoading });
+            const res = await api.get('/workers');
+            setWorkers(res.data || []);
         } catch (error) {
             if (import.meta.env.DEV) console.error("Fetch experts error", error);
         } finally {

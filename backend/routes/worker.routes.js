@@ -10,7 +10,7 @@ import upload from '../middleware/upload.middleware.js';
 
 const router = express.Router();
 
-router.get('/', protect, getWorkers);
+router.get('/', getWorkers);
 router.get('/stats', protect, getWorkerStats);
 router.get('/earnings', protect, getWorkerEarnings);
 router.post('/apply', protect, upload.single('idProof'), applyToBecomeWorker);
@@ -23,6 +23,6 @@ router.post('/portfolio', protect, addPortfolioImage);
 router.delete('/portfolio/:imgId', protect, deletePortfolioImage);
 router.put('/portfolio/:imgId/featured', protect, togglePortfolioFeatured);
 router.put('/:id/verify', protect, adminObj, verifyWorker);
-router.get('/:id', protect, getWorkerById);
+router.get('/:id', getWorkerById);
 
 export default router;
