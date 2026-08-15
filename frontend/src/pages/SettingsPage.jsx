@@ -19,6 +19,7 @@ import {
     fetchReleaseHistory 
 } from '../utils/appVersion';
 import UpdateModal from '../components/UpdateModal';
+import { triggerTestOfflineNotification } from '../services/offlineNotificationService';
 
 const SettingsPage = () => {
     const { user, updateUser, logout } = useAuth();
@@ -471,6 +472,27 @@ const SettingsPage = () => {
                                                 )}
                                             </div>
                                         ))}
+
+                                        {/* Android Offline Notification Test Card */}
+                                        <div className="flex items-center justify-between p-6 bg-ivory-subtle rounded-3xl border border-royal-gold/10 mt-6 shadow-sm">
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-black uppercase tracking-widest text-[var(--text-main)]">
+                                                        Android Offline Alert Engine
+                                                    </span>
+                                                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[8px] font-black uppercase">Active</span>
+                                                </div>
+                                                <p className="text-[10px] text-[var(--text-muted)] font-medium">
+                                                    Automatically pushes native system notifications whenever cellular/Wi-Fi connection drops.
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={triggerTestOfflineNotification}
+                                                className="px-4 py-2.5 rounded-xl bg-navy-deep text-royal-gold hover:bg-navy-light font-black text-[10px] uppercase tracking-wider shadow-md transition-all shrink-0 active:scale-95"
+                                            >
+                                                Test Alert
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}

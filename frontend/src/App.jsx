@@ -7,6 +7,7 @@ import Navbar from './components/Navbar';
 import OfflineBanner from './components/OfflineBanner';
 import UpdateModal from './components/UpdateModal';
 import { checkAppUpdate } from './utils/appVersion';
+import { initOfflineNotificationService } from './services/offlineNotificationService';
 import { WorkerProvider } from './context/WorkerContext';
 import { Toaster } from 'react-hot-toast';
 
@@ -78,6 +79,11 @@ const App = () => {
   // Resilient dashboard check: normalize path (decode %20 and handle space/hyphen mismatches)
   const normalizedPath = decodeURIComponent(location.pathname).toLowerCase();
   const isDashboard = DASHBOARD_ROUTES.some(r => normalizedPath.startsWith(r.toLowerCase()));
+
+  // Initialize Native Android Offline Notification Listener on startup
+  useEffect(() => {
+    initOfflineNotificationService();
+  }, []);
 
   // Silent update check 2s after launch - ONLY for Native Android App (Never on website)
   useEffect(() => {
