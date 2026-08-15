@@ -11,6 +11,19 @@ const router = express.Router();
 // Release history changelog
 const APP_RELEASE_HISTORY = [
     {
+        version: '1.4.0',
+        versionCode: 4,
+        releaseDate: '2026-08-15',
+        type: 'major',
+        title: 'HD VoIP Calling Engine & Live In-App Updater',
+        highlights: [
+            '🚀 Live In-App Auto Updater with Release History Center',
+            '📞 Crystal-clear WebRTC two-way audio & video calling',
+            '📱 Centered circular call action buttons tailored for mobile',
+            '⚡ Instant painter booking & live status synchronization'
+        ]
+    },
+    {
         version: '1.3.0',
         versionCode: 3,
         releaseDate: '2026-08-15',
@@ -62,16 +75,16 @@ const APP_RELEASE_HISTORY = [
     }
 ];
 
-// Current system version configuration
+// Current system version configuration - Published live for Android apps
 const APP_VERSION_DATA = {
-    latestVersion: '1.3.0',
-    versionCode: 3,
+    latestVersion: '1.4.0',
+    versionCode: 4,
     minSupportedVersion: '1.0.0',
     releaseDate: '2026-08-15',
-    title: 'New Update Available (v1.3.0) 🚀',
+    title: 'New Update Available (v1.4.0) 🚀',
     releaseNotes: APP_RELEASE_HISTORY[0].highlights,
     history: APP_RELEASE_HISTORY,
-    downloadUrl: 'https://github.com/itsarunkumarx/find-your-painter/releases/download/v1.3.0/find-your-painter.apk',
+    downloadUrl: 'https://github.com/itsarunkumarx/find-your-painter/releases/download/v1.4.0/find-your-painter.apk',
     webUrl: 'https://find-your-painter.vercel.app',
     forceUpdate: false
 };
