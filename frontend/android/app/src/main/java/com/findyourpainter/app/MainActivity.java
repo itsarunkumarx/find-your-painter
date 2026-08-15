@@ -1,10 +1,10 @@
 package com.findyourpainter.app;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.pm.PackageManager;
+import android.media.AudioManager;
 import android.os.Bundle;
-import android.webkit.PermissionRequest;
-import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import androidx.core.app.ActivityCompat;
@@ -18,11 +18,11 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Standard Android runtime permission check for Camera and Microphone
-        // This is necessary for Android 6.0+ regardless of manifest entries
+        // Request Camera and Microphone permissions at startup
         String[] permissions = {
             Manifest.permission.CAMERA,
-            Manifest.permission.RECORD_AUDIO
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.MODIFY_AUDIO_SETTINGS
         };
 
         boolean allGranted = true;
@@ -36,31 +36,37 @@ public class MainActivity extends BridgeActivity {
         if (!allGranted) {
             ActivityCompat.requestPermissions(this, permissions, PERMISSION_REQUEST_CODE);
         }
+
+        // Configure system audio manager for VoIP calling
+        try {
+            AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            if (audioManager != null) {
+                audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+                audioManager.setSpeakerphoneOn(true);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
     public void onStart() {
         super.onStart();
         
-        // Enhance WebView settings for WebRTC support in Android APK
-        WebView webView = (WebView) this.bridge.getWebView();
-        WebSettings settings = webView.getSettings();
-        
-        settings.setJavaScriptEnabled(true);
-        settings.setMediaPlaybackRequiresUserGesture(false);
-        settings.setAllowFileAccess(true);
-        settings.setDomStorageEnabled(true);
-        
-        // Use the existing WebChromeClient from the bridge if possible, or set a new one
-        // Capacitor Bridge usually sets its own WebChromeClient, so we just need to ensure
-        // onPermissionRequest is handled for WebRTC.
-        webView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onPermissionRequest(final PermissionRequest request) {
-                // Automatically grant permissions requested by the WebView (Camera, Mic)
-                // In production, you might want to check the requested resources if needed
-                runOnUiThread(() -> request.grant(request.getResources()));
+        // Configure WebView settings for seamless WebRTC audio/video playback
+        try {
+            WebView webView = (WebView) this.bridge.getWebView();
+            if (webView != null) {
+                WebSettings settings = webView.getSettings();
+                settings.setJavaScriptEnabled(true);
+                settings.setMediaPlaybackRequiresUserGesture(false);
+                settings.setAllowFileAccess(true);
+                settings.setDomStorageEnabled(true);
+                settings.setDatabaseEnabled(true);
+                settings.setAllowContentAccess(true);
             }
-        });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

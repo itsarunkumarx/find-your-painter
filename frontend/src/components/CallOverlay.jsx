@@ -28,6 +28,7 @@ const CallOverlay = ({
     const remoteVideoRef = useRef(null);
     const localVideoRef  = useRef(null);
     const remoteAudioRef = useRef(null);
+    const audioCtxRef    = useRef(null);
     
     const [audioUnlocked, setAudioUnlocked] = useState(false);
     const [audioError, setAudioError] = useState(false);
@@ -40,10 +41,31 @@ const CallOverlay = ({
     const isTerminated = ['busy', 'declined', 'no_answer', 'failed'].includes(status);
     const isConnected = status === 'connected' || !!call?.remoteStream;
 
-    // Attach and play remote stream immediately
+    // Attach and play remote stream immediately via Video, Audio, and WebAudio Context
     const attachAndPlay = useCallback(async (stream) => {
         if (!stream) return;
 
+        // 1. Direct WebAudio hardware routing for Android/iOS calling
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+                if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+                    audioCtxRef.current = new AudioCtx();
+                }
+                if (audioCtxRef.current.state === 'suspended') {
+                    await audioCtxRef.current.resume();
+                }
+                const audioTracks = stream.getAudioTracks();
+                if (audioTracks.length > 0) {
+                    const source = audioCtxRef.current.createMediaStreamSource(new MediaStream(audioTracks));
+                    source.connect(audioCtxRef.current.destination);
+                }
+            }
+        } catch (e) {
+            // Fallback continues to HTML media elements
+        }
+
+        // 2. Video element for video calls
         if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = stream;
             remoteVideoRef.current.playsInline = true;
@@ -53,7 +75,6 @@ const CallOverlay = ({
                 setAudioUnlocked(true);
                 setAudioError(false);
             } catch (err) {
-                // If unmuted autoplay blocked by browser policy, play muted and show tap unmute prompt
                 try {
                     remoteVideoRef.current.muted = true;
                     await remoteVideoRef.current.play();
@@ -62,6 +83,7 @@ const CallOverlay = ({
             }
         }
 
+        // 3. Audio element for voice calls
         if (remoteAudioRef.current) {
             remoteAudioRef.current.srcObject = stream;
             remoteAudioRef.current.volume = 1.0;
@@ -74,6 +96,15 @@ const CallOverlay = ({
                 setAudioError(true);
             }
         }
+    }, []);
+
+    // Clean up AudioContext on component unmount
+    useEffect(() => {
+        return () => {
+            if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+                audioCtxRef.current.close().catch(() => {});
+            }
+        };
     }, []);
 
     // Re-attach when remote stream changes
@@ -94,6 +125,9 @@ const CallOverlay = ({
     const handleUnlockAudio = useCallback(async () => {
         setAudioError(false);
         setAudioUnlocked(true);
+        if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+            audioCtxRef.current.resume().catch(() => {});
+        }
         if (remoteVideoRef.current) {
             remoteVideoRef.current.muted = false;
             remoteVideoRef.current.play().catch(() => {});
@@ -401,12 +435,14 @@ const CallOverlay = ({
                 </div>
             )}
 
-            {/* ── DEDICATED REMOTE AUDIO ELEMENT ────────────────────────────── */}
+            {/* ── DEDICATED REMOTE AUDIO ELEMENT (Active Offscreen Layout) ─── */}
             <audio
                 ref={remoteAudioRef}
                 autoPlay
                 playsInline
-                className="hidden"
+                webkit-playsinline="true"
+                x5-playsinline="true"
+                style={{ position: 'fixed', top: -9999, left: -9999, width: '1px', height: '1px', opacity: 0.01, pointerEvents: 'none' }}
                 onPlay={() => { setAudioUnlocked(true); setAudioError(false); }}
             />
         </motion.div>

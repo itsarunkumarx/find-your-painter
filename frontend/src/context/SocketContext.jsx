@@ -418,7 +418,11 @@ export const SocketProvider = ({ children }) => {
                 { urls: 'stun:stun1.l.google.com:19302' },
                 { urls: 'stun:stun2.l.google.com:19302' },
                 { urls: 'stun:stun3.l.google.com:19302' },
-                // TURN relay servers — required for calls on restricted networks (mobile data, NAT, firewalls)
+                { urls: 'stun:stun4.l.google.com:19302' },
+                { urls: 'stun:stun.cloudflare.com:3478' },
+                { urls: 'stun:global.stun.twilio.com:3478' },
+                { urls: 'stun:stun.services.mozilla.com:3478' },
+                // Multi-transport TURN Relays for Symmetric NAT / 4G / 5G Mobile Data Traversal
                 {
                     urls: 'turn:openrelay.metered.ca:80',
                     username: 'openrelayproject',
@@ -435,8 +439,18 @@ export const SocketProvider = ({ children }) => {
                     credential: 'openrelayproject'
                 }
             ],
-            iceCandidatePoolSize: 10
+            iceCandidatePoolSize: 10,
+            bundlePolicy: 'max-bundle',
+            rtcpMuxPolicy: 'require'
         });
+
+        // Initialize transceivers for bi-directional audio/video communication
+        try {
+            peer.addTransceiver('audio', { direction: 'sendrecv' });
+            peer.addTransceiver('video', { direction: 'sendrecv' });
+        } catch (e) {
+            // Fallback for browsers that add tracks dynamically
+        }
 
         peer.onicecandidate = (event) => {
             if (event.candidate && socketRef.current) {
@@ -445,7 +459,7 @@ export const SocketProvider = ({ children }) => {
         };
 
         peer.ontrack = (event) => {
-            if (import.meta.env.DEV) console.log('[WebRTC] ontrack:', event.track.kind, event.track.id);
+            if (import.meta.env.DEV) console.log('[WebRTC] ontrack received:', event.track.kind, event.track.id);
 
             let remoteStream = (event.streams && event.streams[0]) ? event.streams[0] : null;
             if (!remoteStream) {
@@ -460,6 +474,9 @@ export const SocketProvider = ({ children }) => {
                 pendingRemoteStreamRef.current = remoteStream;
             }
 
+            // Ensure audio and video tracks are explicitly enabled
+            event.track.enabled = true;
+
             setActiveCall(prev => {
                 if (!prev) return prev;
                 return { ...prev, remoteStream };
@@ -467,14 +484,26 @@ export const SocketProvider = ({ children }) => {
         };
 
         peer.onconnectionstatechange = () => {
-            // console.log('[WebRTC] Connection state:', peer.connectionState);
+            if (import.meta.env.DEV) console.log('[WebRTC] Connection state:', peer.connectionState);
             if (peer.connectionState === 'connected') {
                 if (pendingRemoteStreamRef.current && pendingRemoteStreamRef.current.getTracks().length > 0) {
                     setActiveCall(prev => prev ? { ...prev, remoteStream: pendingRemoteStreamRef.current } : prev);
                 }
             }
-            if (['disconnected', 'failed', 'closed'].includes(peer.connectionState)) {
-                hangUp();
+            if (['failed'].includes(peer.connectionState)) {
+                if (typeof peer.restartIce === 'function') {
+                    if (import.meta.env.DEV) console.log('[WebRTC] Attempting ICE restart...');
+                    peer.restartIce();
+                } else {
+                    hangUp();
+                }
+            }
+        };
+
+        peer.oniceconnectionstatechange = () => {
+            if (import.meta.env.DEV) console.log('[WebRTC] ICE connection state:', peer.iceConnectionState);
+            if (peer.iceConnectionState === 'failed' && typeof peer.restartIce === 'function') {
+                peer.restartIce();
             }
         };
 
