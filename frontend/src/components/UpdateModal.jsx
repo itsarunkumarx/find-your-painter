@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Capacitor } from '@capacitor/core';
 import { 
     FaRocket, 
     FaDownload, 
@@ -17,10 +18,12 @@ const UpdateModal = ({ isOpen, onClose, updateInfo }) => {
 
     if (!isOpen || !updateInfo) return null;
 
-    const isNativeAndroid = typeof window !== 'undefined' && (
-        window.Capacitor?.isNativePlatform?.() || 
-        window.location.protocol === 'capacitor:' ||
-        /Android/i.test(navigator.userAgent)
+    const isNativeAndroid = Capacitor.isNativePlatform() || (
+        typeof window !== 'undefined' && (
+            Capacitor.getPlatform() === 'android' ||
+            window.Capacitor?.isNativePlatform?.() || 
+            /Android/i.test(navigator.userAgent)
+        )
     );
 
     const handleUpdate = async () => {

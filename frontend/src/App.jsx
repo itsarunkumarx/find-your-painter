@@ -1,5 +1,6 @@
 import { Suspense, lazy, useState, useEffect } from 'react';
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import ProtectedRoute from './components/ProtectedRoute';
 import DashboardLayout from './components/DashboardLayout';
 import Navbar from './components/Navbar';
@@ -78,14 +79,17 @@ const App = () => {
   const normalizedPath = decodeURIComponent(location.pathname).toLowerCase();
   const isDashboard = DASHBOARD_ROUTES.some(r => normalizedPath.startsWith(r.toLowerCase()));
 
-  // Silent update check 3s after launch - ONLY for Native Android App (Never on website)
+  // Silent update check 2s after launch - ONLY for Native Android App (Never on website)
   useEffect(() => {
-    const isNativeAndroid = typeof window !== 'undefined' && (
-      window.Capacitor?.isNativePlatform?.() || 
-      window.location.protocol === 'capacitor:'
+    const isNativeAndroid = Capacitor.isNativePlatform() || (
+      typeof window !== 'undefined' && (
+        Capacitor.getPlatform() === 'android' ||
+        window.Capacitor?.isNativePlatform?.() ||
+        (window.location.hostname === 'localhost' && window.location.port === '')
+      )
     );
 
-    // If on web browser, do not show update modal
+    // If running in regular web browser, do not auto-show update popup
     if (!isNativeAndroid) return;
 
     const timer = setTimeout(async () => {
@@ -94,7 +98,7 @@ const App = () => {
         setUpdateInfo(result.updateInfo);
         setShowUpdateModal(true);
       }
-    }, 3000);
+    }, 2000);
     return () => clearTimeout(timer);
   }, []);
 
