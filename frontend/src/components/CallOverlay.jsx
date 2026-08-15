@@ -326,64 +326,77 @@ const CallOverlay = ({
                 )}
             </div>
 
-            {/* ── 5. BOTTOM CONTROL DOCK ────────────────────────────────────── */}
+            {/* ── 5. BOTTOM CONTROL DOCK (WhatsApp / iOS Native Call Style) ─── */}
             {!isTerminated && (
-                <div className="relative z-30 pb-10 px-6 flex items-center justify-center">
-                    <div className="flex items-center gap-3 sm:gap-5 bg-navy-deep/80 backdrop-blur-2xl px-6 py-4 rounded-3xl border border-white/10 shadow-2xl max-w-full overflow-x-auto">
+                <div className="relative z-30 pb-8 sm:pb-12 px-4 w-full flex items-center justify-center pointer-events-auto">
+                    <div className="w-full max-w-sm flex items-center justify-between gap-1 sm:gap-2 px-5 py-4 rounded-[2.2rem] bg-navy-deep/90 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
                         {/* Mic Mute Button */}
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
-                            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${
-                                isMuted ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-white/10 text-white hover:bg-white/20'
-                            }`}
-                            title="Mute/Unmute Mic"
-                        >
-                            {isMuted ? <FaMicrophoneSlash size={18} /> : <FaMicrophone size={18} />}
-                        </button>
+                        <div className="flex flex-col items-center gap-1.5">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
+                                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-95 ${
+                                    isMuted ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-white/10 text-white hover:bg-white/20'
+                                }`}
+                                title="Mute Mic"
+                            >
+                                {isMuted ? <FaMicrophoneSlash size={18} /> : <FaMicrophone size={18} />}
+                            </button>
+                            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider">{isMuted ? 'Unmute' : 'Mute'}</span>
+                        </div>
 
-                        {/* Video Toggle (Video Calls only) */}
-                        {isVideo && (
+                        {/* Video Toggle */}
+                        <div className="flex flex-col items-center gap-1.5">
                             <button
                                 onClick={(e) => { e.stopPropagation(); onToggleVideo(); }}
-                                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${
-                                    isVideoOff ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-white/10 text-white hover:bg-white/20'
+                                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-95 ${
+                                    isVideoOff ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-white/10 text-white hover:bg-white/20'
                                 }`}
                                 title="Toggle Video"
                             >
                                 {isVideoOff ? <FaVideoSlash size={18} /> : <FaVideo size={18} />}
                             </button>
-                        )}
+                            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider">{isVideoOff ? 'Cam Off' : 'Camera'}</span>
+                        </div>
 
                         {/* Call Recording */}
-                        <button
-                            onClick={(e) => { e.stopPropagation(); toggleRecording(); }}
-                            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${
-                                isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-white/10 text-white hover:bg-white/20'
-                            }`}
-                            title={isRecording ? 'Stop Recording' : 'Record Call'}
-                        >
-                            <div className={`w-3.5 h-3.5 rounded-full ${isRecording ? 'bg-white' : 'bg-red-500'}`} />
-                        </button>
-
-                        {/* Call Transfer */}
-                        {onTransfer && (
+                        <div className="flex flex-col items-center gap-1.5">
                             <button
-                                onClick={(e) => { e.stopPropagation(); onTransfer(); }}
-                                className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/10 text-white hover:bg-royal-gold/30 hover:text-royal-gold flex items-center justify-center transition-all"
-                                title="Transfer Call"
+                                onClick={(e) => { e.stopPropagation(); toggleRecording(); }}
+                                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-95 ${
+                                    isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-white/10 text-white hover:bg-white/20'
+                                }`}
+                                title="Record Call"
                             >
-                                <FaRandom size={16} />
+                                <div className={`w-3.5 h-3.5 rounded-full ${isRecording ? 'bg-white' : 'bg-red-500'}`} />
                             </button>
+                            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider">{isRecording ? 'Rec...' : 'Record'}</span>
+                        </div>
+
+                        {/* Transfer */}
+                        {onTransfer && (
+                            <div className="flex flex-col items-center gap-1.5">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onTransfer(); }}
+                                    className="w-12 h-12 rounded-full bg-white/10 text-white hover:bg-royal-gold/30 hover:text-royal-gold flex items-center justify-center transition-all active:scale-95"
+                                    title="Transfer Call"
+                                >
+                                    <FaRandom size={16} />
+                                </button>
+                                <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider">Transfer</span>
+                            </div>
                         )}
 
                         {/* End Call Button */}
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onHangUp(); }}
-                            className="w-14 h-14 sm:w-16 sm:h-16 bg-red-600 hover:bg-red-700 active:scale-95 rounded-2xl flex items-center justify-center transition-all shadow-xl shadow-red-600/40 text-white"
-                            title="End Call"
-                        >
-                            <FaPhoneSlash size={22} className="rotate-[135deg]" />
-                        </button>
+                        <div className="flex flex-col items-center gap-1.5">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onHangUp(); }}
+                                className="w-13 h-13 sm:w-14 sm:h-14 bg-red-600 hover:bg-red-700 active:scale-90 rounded-full flex items-center justify-center transition-all shadow-xl shadow-red-600/50 text-white"
+                                title="End Call"
+                            >
+                                <FaPhoneSlash size={20} className="rotate-[135deg]" />
+                            </button>
+                            <span className="text-[9px] font-bold text-red-400 uppercase tracking-wider">End</span>
+                        </div>
                     </div>
                 </div>
             )}
