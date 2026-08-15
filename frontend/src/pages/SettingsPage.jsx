@@ -11,7 +11,13 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useRef, useEffect } from 'react';
 import { useSocket } from '../hooks/useSocket';
-import { checkAppUpdate, CURRENT_APP_VERSION } from '../utils/appVersion';
+import { 
+    checkAppUpdate, 
+    CURRENT_APP_VERSION, 
+    getUpdatePreferences, 
+    saveUpdatePreferences, 
+    fetchReleaseHistory 
+} from '../utils/appVersion';
 import UpdateModal from '../components/UpdateModal';
 
 const SettingsPage = () => {
@@ -23,6 +29,9 @@ const SettingsPage = () => {
     const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
     const [updateResult, setUpdateResult] = useState(null);
     const [showUpdateModal, setShowUpdateModal] = useState(false);
+    const [updatePrefs, setUpdatePrefs] = useState(getUpdatePreferences());
+    const [releaseHistory, setReleaseHistory] = useState([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
     const fileInputRef = useRef(null);
 
     // Profile State
@@ -125,6 +134,28 @@ const SettingsPage = () => {
         logout();
         navigate('/roles');
     };
+
+    const handleUpdatePrefToggle = (key) => {
+        const updated = saveUpdatePreferences({ [key]: !updatePrefs[key] });
+        setUpdatePrefs(updated);
+        toast.success(`Updated: ${key} is now ${updated[key] ? 'Enabled' : 'Disabled'}`);
+    };
+
+    const handleChannelChange = (channel) => {
+        const updated = saveUpdatePreferences({ channel });
+        setUpdatePrefs(updated);
+        toast.success(`Switched to ${channel.toUpperCase()} release channel`);
+    };
+
+    useEffect(() => {
+        if (activeTab === 'updates' && releaseHistory.length === 0) {
+            setLoadingHistory(true);
+            fetchReleaseHistory().then(history => {
+                setReleaseHistory(history);
+                setLoadingHistory(false);
+            });
+        }
+    }, [activeTab, releaseHistory.length]);
 
     const handleManualUpdateCheck = async () => {
         setIsCheckingUpdate(true);
@@ -446,28 +477,30 @@ const SettingsPage = () => {
 
                             {activeTab === 'updates' && (
                                 <div className="space-y-8 max-w-2xl">
-                                    <div className="p-8 bg-ivory-subtle rounded-3xl border border-royal-gold/10 relative overflow-hidden">
+                                    {/* 1. Installed Version Hero Card */}
+                                    <div className="p-8 bg-ivory-subtle rounded-3xl border border-royal-gold/10 relative overflow-hidden shadow-sm">
                                         <div className="flex items-start justify-between">
                                             <div className="space-y-2">
                                                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-royal-gold/15 text-royal-gold text-[10px] font-black uppercase tracking-widest">
-                                                    <span>Installed Version</span>
+                                                    <span>Installed Engine Version</span>
                                                 </div>
-                                                <h3 className="text-2xl font-black text-[var(--text-main)]">
+                                                <h3 className="text-3xl font-black text-[var(--text-main)]">
                                                     v{CURRENT_APP_VERSION}
                                                 </h3>
-                                                <p className="text-xs text-[var(--text-muted)]">
-                                                    Find Your Painter Engine • Production Release
+                                                <p className="text-xs text-[var(--text-muted)] font-medium">
+                                                    Find Your Painter Core • Channel: <span className="text-royal-gold font-bold uppercase">{updatePrefs.channel}</span>
                                                 </p>
                                             </div>
-                                            <div className="w-14 h-14 rounded-2xl bg-navy-deep text-royal-gold flex items-center justify-center shadow-xl">
-                                                <FaRocket size={24} />
+                                            <div className="w-16 h-16 rounded-3xl bg-navy-deep text-royal-gold flex items-center justify-center shadow-xl border border-royal-gold/20">
+                                                <FaRocket size={26} />
                                             </div>
                                         </div>
 
                                         <div className="mt-8 pt-6 border-t border-royal-gold/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-                                            <div className="text-xs text-[var(--text-muted)] font-medium">
-                                                <span>OTA Update Signal: </span>
-                                                <span className="text-emerald-500 font-bold">Active & Online</span>
+                                            <div className="text-xs text-[var(--text-muted)] font-medium flex items-center gap-2">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                <span>OTA Update Server: </span>
+                                                <span className="text-emerald-500 font-bold">Online & Synchronized</span>
                                             </div>
                                             <button
                                                 onClick={handleManualUpdateCheck}
@@ -475,20 +508,114 @@ const SettingsPage = () => {
                                                 className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-navy-deep text-royal-gold hover:bg-navy-light font-black text-xs uppercase tracking-widest shadow-lg shadow-navy-deep/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
                                             >
                                                 <FaSyncAlt className={isCheckingUpdate ? 'animate-spin' : ''} />
-                                                <span>{isCheckingUpdate ? 'Checking...' : 'Check for Updates'}</span>
+                                                <span>{isCheckingUpdate ? 'Scanning...' : 'Check for Updates'}</span>
                                             </button>
                                         </div>
                                     </div>
 
-                                    {/* Direct Android APK download card */}
+                                    {/* 2. Auto-Update Preferences Toggles */}
+                                    <div className="space-y-4">
+                                        <div className="px-2">
+                                            <h4 className="text-xs font-black uppercase tracking-widest text-[var(--text-main)]">
+                                                Update Preferences & Automation
+                                            </h4>
+                                            <p className="text-[10px] text-[var(--text-muted)]">Configure how and when your app receives new features.</p>
+                                        </div>
+
+                                        {/* Toggle 1: Auto-Update Notifications */}
+                                        <div className="flex items-center justify-between p-6 bg-ivory-subtle rounded-3xl border border-royal-gold/5 hover:border-royal-gold/20 transition-all">
+                                            <div>
+                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-[var(--text-main)]">
+                                                    Automatic Update Notifications
+                                                </h4>
+                                                <p className="text-[9px] font-bold text-[var(--text-muted)] mt-1">
+                                                    Prompt automatically on launch when a newer APK version is published
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => handleUpdatePrefToggle('autoUpdateEnabled')}
+                                                className={`w-14 h-7 rounded-full relative transition-all duration-500 shadow-inner ${
+                                                    updatePrefs.autoUpdateEnabled ? 'bg-navy-deep' : 'bg-slate-200'
+                                                }`}
+                                            >
+                                                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-lg transition-all duration-500 flex items-center justify-center ${
+                                                    updatePrefs.autoUpdateEnabled ? 'left-8 bg-royal-gold' : 'left-1'
+                                                }`}>
+                                                    {updatePrefs.autoUpdateEnabled && <FaCheckCircle className="text-navy-deep text-[10px]" />}
+                                                </div>
+                                            </button>
+                                        </div>
+
+                                        {/* Toggle 2: Download Over Wi-Fi Only */}
+                                        <div className="flex items-center justify-between p-6 bg-ivory-subtle rounded-3xl border border-royal-gold/5 hover:border-royal-gold/20 transition-all">
+                                            <div>
+                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-[var(--text-main)]">
+                                                    Download Over Wi-Fi Only
+                                                </h4>
+                                                <p className="text-[9px] font-bold text-[var(--text-muted)] mt-1">
+                                                    Prevent large APK binary downloads over cellular data
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => handleUpdatePrefToggle('wifiOnly')}
+                                                className={`w-14 h-7 rounded-full relative transition-all duration-500 shadow-inner ${
+                                                    updatePrefs.wifiOnly ? 'bg-navy-deep' : 'bg-slate-200'
+                                                }`}
+                                            >
+                                                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-lg transition-all duration-500 flex items-center justify-center ${
+                                                    updatePrefs.wifiOnly ? 'left-8 bg-royal-gold' : 'left-1'
+                                                }`}>
+                                                    {updatePrefs.wifiOnly && <FaCheckCircle className="text-navy-deep text-[10px]" />}
+                                                </div>
+                                            </button>
+                                        </div>
+
+                                        {/* Channel Selector */}
+                                        <div className="p-6 bg-ivory-subtle rounded-3xl border border-royal-gold/5">
+                                            <div className="mb-3">
+                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-[var(--text-main)]">
+                                                    Release Channel
+                                                </h4>
+                                                <p className="text-[9px] font-bold text-[var(--text-muted)] mt-0.5">
+                                                    Choose between verified stable builds or early-access beta features
+                                                </p>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    onClick={() => handleChannelChange('stable')}
+                                                    className={`py-3 px-4 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                                                        updatePrefs.channel === 'stable'
+                                                            ? 'bg-navy-deep text-royal-gold shadow-md'
+                                                            : 'bg-white/80 text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                                                    }`}
+                                                >
+                                                    {updatePrefs.channel === 'stable' && <FaCheckCircle size={12} />}
+                                                    <span>Stable (Production)</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleChannelChange('beta')}
+                                                    className={`py-3 px-4 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                                                        updatePrefs.channel === 'beta'
+                                                            ? 'bg-navy-deep text-royal-gold shadow-md'
+                                                            : 'bg-white/80 text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                                                    }`}
+                                                >
+                                                    {updatePrefs.channel === 'beta' && <FaCheckCircle size={12} />}
+                                                    <span>Beta (Early Access)</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 3. Direct Android APK download card */}
                                     <div className="p-6 bg-gradient-to-br from-navy-deep to-[#111c35] text-white rounded-3xl border border-royal-gold/20 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
                                         <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+                                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
                                                 <FaAndroid size={24} />
                                             </div>
                                             <div>
-                                                <h4 className="text-sm font-black uppercase tracking-wider text-white">Android Native Package (APK)</h4>
-                                                <p className="text-[10px] text-slate-300">Download the direct APK installer for offline deployment</p>
+                                                <h4 className="text-sm font-black uppercase tracking-wider text-white">Android Package Installer (APK)</h4>
+                                                <p className="text-[10px] text-slate-300">Download the standalone debug/release APK directly</p>
                                             </div>
                                         </div>
                                         <a
@@ -500,6 +627,62 @@ const SettingsPage = () => {
                                             <FaDownload />
                                             <span>Download APK</span>
                                         </a>
+                                    </div>
+
+                                    {/* 4. Release History & Changelogs */}
+                                    <div className="space-y-4 pt-4">
+                                        <div className="px-2 flex items-center justify-between">
+                                            <div>
+                                                <h4 className="text-xs font-black uppercase tracking-widest text-[var(--text-main)]">
+                                                    Version Release History & Changelogs
+                                                </h4>
+                                                <p className="text-[10px] text-[var(--text-muted)]">Official changelogs and platform roadmap updates.</p>
+                                            </div>
+                                            <span className="text-[10px] font-black uppercase text-royal-gold bg-royal-gold/10 px-3 py-1 rounded-full">
+                                                {releaseHistory.length} Releases
+                                            </span>
+                                        </div>
+
+                                        {loadingHistory ? (
+                                            <div className="p-8 text-center bg-ivory-subtle rounded-3xl text-xs text-[var(--text-muted)]">
+                                                <FaSyncAlt className="animate-spin inline mr-2" />
+                                                Loading release logs...
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {releaseHistory.map((item) => (
+                                                    <div
+                                                        key={item.version}
+                                                        className="p-6 bg-ivory-subtle rounded-3xl border border-royal-gold/10 hover:border-royal-gold/25 transition-all space-y-3"
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-2.5">
+                                                                <span className="px-3 py-1 rounded-xl bg-navy-deep text-royal-gold font-mono font-black text-xs">
+                                                                    v{item.version}
+                                                                </span>
+                                                                <span className="text-xs font-black text-[var(--text-main)]">
+                                                                    {item.title}
+                                                                </span>
+                                                            </div>
+                                                            <span className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                                                                {item.releaseDate}
+                                                            </span>
+                                                        </div>
+
+                                                        {item.highlights && item.highlights.length > 0 && (
+                                                            <div className="space-y-1.5 pl-1 pt-1 border-t border-royal-gold/5">
+                                                                {item.highlights.map((note, nIdx) => (
+                                                                    <div key={nIdx} className="flex items-start gap-2 text-xs text-[var(--text-muted)]">
+                                                                        <span className="text-royal-gold text-[10px] mt-0.5">•</span>
+                                                                        <span className="text-[11px] font-medium leading-relaxed">{note}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}

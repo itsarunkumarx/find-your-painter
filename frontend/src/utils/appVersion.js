@@ -4,6 +4,34 @@ import safeStorage from './safeStorage';
 export const CURRENT_APP_VERSION = '1.3.0';
 export const CURRENT_VERSION_CODE = 3;
 
+// Default Update Preferences
+const DEFAULT_PREFERENCES = {
+    autoUpdateEnabled: true,
+    channel: 'stable', // 'stable' | 'beta'
+    wifiOnly: false,
+    autoCheckOnStartup: true
+};
+
+// Retrieve saved update preferences
+export const getUpdatePreferences = () => {
+    try {
+        const saved = safeStorage.getItem('app_update_preferences');
+        if (saved) return { ...DEFAULT_PREFERENCES, ...JSON.parse(saved) };
+    } catch (e) {}
+    return DEFAULT_PREFERENCES;
+};
+
+// Save update preferences
+export const saveUpdatePreferences = (prefs) => {
+    try {
+        const updated = { ...getUpdatePreferences(), ...prefs };
+        safeStorage.setItem('app_update_preferences', JSON.stringify(updated));
+        return updated;
+    } catch (e) {
+        return DEFAULT_PREFERENCES;
+    }
+};
+
 // Semantic version comparison: returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal
 export const compareVersions = (v1, v2) => {
     const clean1 = (v1 || '').replace(/^v/i, '').split('.').map(Number);
@@ -22,6 +50,13 @@ export const compareVersions = (v1, v2) => {
 // Check for updates against backend
 export const checkAppUpdate = async (manualCheck = false) => {
     try {
+        const prefs = getUpdatePreferences();
+
+        // If automatic check and user disabled auto-update, skip
+        if (!manualCheck && !prefs.autoUpdateEnabled) {
+            return { hasUpdate: false, updateInfo: null, isDisabled: true };
+        }
+
         const { data } = await api.get('/app/version');
         if (!data || !data.latestVersion) {
             return { hasUpdate: false, updateInfo: null };
@@ -44,6 +79,16 @@ export const checkAppUpdate = async (manualCheck = false) => {
     } catch (err) {
         if (import.meta.env.DEV) console.warn('[AppUpdate] Failed to fetch version info:', err.message);
         return { hasUpdate: false, updateInfo: null, error: err.message };
+    }
+};
+
+// Fetch full release history
+export const fetchReleaseHistory = async () => {
+    try {
+        const { data } = await api.get('/app/history');
+        return data?.history || [];
+    } catch (e) {
+        return [];
     }
 };
 
