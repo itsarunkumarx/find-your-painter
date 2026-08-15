@@ -328,74 +328,74 @@ const CallOverlay = ({
 
             {/* ── 5. BOTTOM CONTROL DOCK (WhatsApp / iOS Native Call Style) ─── */}
             {!isTerminated && (
-                <div className="relative z-30 pb-8 sm:pb-12 px-4 w-full flex items-center justify-center pointer-events-auto">
-                    <div className="w-full max-w-sm flex items-center justify-between gap-1 sm:gap-2 px-5 py-4 rounded-[2.2rem] bg-navy-deep/90 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+                <div className="relative z-30 pb-8 sm:pb-12 px-3 w-full flex items-center justify-center pointer-events-auto">
+                    <div className="w-[94%] max-w-[340px] flex items-center justify-between gap-1 px-4 py-3 sm:px-5 sm:py-4 rounded-[2.2rem] bg-[#0c1424]/95 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.7)]">
                         {/* Mic Mute Button */}
-                        <div className="flex flex-col items-center gap-1.5">
+                        <div className="flex flex-col items-center gap-1 shrink-0">
                             <button
                                 onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
-                                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-95 ${
+                                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${
                                     isMuted ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-white/10 text-white hover:bg-white/20'
                                 }`}
                                 title="Mute Mic"
                             >
-                                {isMuted ? <FaMicrophoneSlash size={18} /> : <FaMicrophone size={18} />}
+                                {isMuted ? <FaMicrophoneSlash size={16} /> : <FaMicrophone size={16} />}
                             </button>
-                            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider">{isMuted ? 'Unmute' : 'Mute'}</span>
+                            <span className="text-[8px] sm:text-[9px] font-bold text-slate-300 uppercase tracking-wider">{isMuted ? 'Unmute' : 'Mute'}</span>
                         </div>
 
                         {/* Video Toggle */}
-                        <div className="flex flex-col items-center gap-1.5">
+                        <div className="flex flex-col items-center gap-1 shrink-0">
                             <button
                                 onClick={(e) => { e.stopPropagation(); onToggleVideo(); }}
-                                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-95 ${
+                                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${
                                     isVideoOff ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-white/10 text-white hover:bg-white/20'
                                 }`}
                                 title="Toggle Video"
                             >
-                                {isVideoOff ? <FaVideoSlash size={18} /> : <FaVideo size={18} />}
+                                {isVideoOff ? <FaVideoSlash size={16} /> : <FaVideo size={16} />}
                             </button>
-                            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider">{isVideoOff ? 'Cam Off' : 'Camera'}</span>
+                            <span className="text-[8px] sm:text-[9px] font-bold text-slate-300 uppercase tracking-wider">{isVideoOff ? 'Cam Off' : 'Camera'}</span>
                         </div>
 
                         {/* Call Recording */}
-                        <div className="flex flex-col items-center gap-1.5">
+                        <div className="flex flex-col items-center gap-1 shrink-0">
                             <button
                                 onClick={(e) => { e.stopPropagation(); toggleRecording(); }}
-                                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-95 ${
+                                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${
                                     isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-white/10 text-white hover:bg-white/20'
                                 }`}
                                 title="Record Call"
                             >
-                                <div className={`w-3.5 h-3.5 rounded-full ${isRecording ? 'bg-white' : 'bg-red-500'}`} />
+                                <div className={`w-3 h-3 rounded-full ${isRecording ? 'bg-white' : 'bg-red-500'}`} />
                             </button>
-                            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider">{isRecording ? 'Rec...' : 'Record'}</span>
+                            <span className="text-[8px] sm:text-[9px] font-bold text-slate-300 uppercase tracking-wider">{isRecording ? 'Rec...' : 'Record'}</span>
                         </div>
 
                         {/* Transfer */}
                         {onTransfer && (
-                            <div className="flex flex-col items-center gap-1.5">
+                            <div className="flex flex-col items-center gap-1 shrink-0">
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onTransfer(); }}
-                                    className="w-12 h-12 rounded-full bg-white/10 text-white hover:bg-royal-gold/30 hover:text-royal-gold flex items-center justify-center transition-all active:scale-95"
+                                    className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-white/10 text-white hover:bg-royal-gold/30 hover:text-royal-gold flex items-center justify-center transition-all active:scale-90"
                                     title="Transfer Call"
                                 >
-                                    <FaRandom size={16} />
+                                    <FaRandom size={15} />
                                 </button>
-                                <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider">Transfer</span>
+                                <span className="text-[8px] sm:text-[9px] font-bold text-slate-300 uppercase tracking-wider">Transfer</span>
                             </div>
                         )}
 
                         {/* End Call Button */}
-                        <div className="flex flex-col items-center gap-1.5">
+                        <div className="flex flex-col items-center gap-1 shrink-0">
                             <button
                                 onClick={(e) => { e.stopPropagation(); onHangUp(); }}
-                                className="w-13 h-13 sm:w-14 sm:h-14 bg-red-600 hover:bg-red-700 active:scale-90 rounded-full flex items-center justify-center transition-all shadow-xl shadow-red-600/50 text-white"
+                                className="w-12 h-12 sm:w-13 sm:h-13 bg-red-600 hover:bg-red-700 active:scale-90 rounded-full flex items-center justify-center transition-all shadow-xl shadow-red-600/50 text-white"
                                 title="End Call"
                             >
-                                <FaPhoneSlash size={20} className="rotate-[135deg]" />
+                                <FaPhoneSlash size={18} className="rotate-[135deg]" />
                             </button>
-                            <span className="text-[9px] font-bold text-red-400 uppercase tracking-wider">End</span>
+                            <span className="text-[8px] sm:text-[9px] font-bold text-red-400 uppercase tracking-wider">End</span>
                         </div>
                     </div>
                 </div>
