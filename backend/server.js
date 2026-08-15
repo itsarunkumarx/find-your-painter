@@ -17,6 +17,7 @@ import notificationRoutes from './routes/notification.routes.js';
 import supportRoutes from './routes/support.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import callRoutes from './routes/call.routes.js';
+import appRoutes from './routes/app.routes.js';
 import { sendCallNotification, createNotification } from './controllers/notification.controller.js';
 import { createCallRecord, updateCallRecord } from './controllers/call.controller.js';
 import path from 'path';
@@ -102,6 +103,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/calls', callRoutes);
+app.use('/api/app', appRoutes);
 
 // Static Uploads Folder - optimized with caching headers
 const uploadPath = path.join(__dirname, 'uploads');

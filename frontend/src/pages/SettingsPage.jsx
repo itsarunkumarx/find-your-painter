@@ -5,12 +5,14 @@ import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
     FaUser, FaBell, FaPalette, FaHistory, FaSignOutAlt, FaShieldAlt, FaLanguage, FaVolumeUp, FaVideo, FaGamepad, FaLink, FaMobileAlt,
-    FaGlobe, FaChevronRight, FaCamera, FaCheckCircle, FaPhone, FaEnvelope, FaMapMarkerAlt, FaLock
+    FaGlobe, FaChevronRight, FaCamera, FaCheckCircle, FaPhone, FaEnvelope, FaMapMarkerAlt, FaLock, FaRocket, FaDownload, FaSyncAlt, FaAndroid
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useRef, useEffect } from 'react';
 import { useSocket } from '../hooks/useSocket';
+import { checkAppUpdate, CURRENT_APP_VERSION } from '../utils/appVersion';
+import UpdateModal from '../components/UpdateModal';
 
 const SettingsPage = () => {
     const { user, updateUser, logout } = useAuth();
@@ -18,6 +20,9 @@ const SettingsPage = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(false);
+    const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+    const [updateResult, setUpdateResult] = useState(null);
+    const [showUpdateModal, setShowUpdateModal] = useState(false);
     const fileInputRef = useRef(null);
 
     // Profile State
@@ -121,11 +126,31 @@ const SettingsPage = () => {
         navigate('/roles');
     };
 
+    const handleManualUpdateCheck = async () => {
+        setIsCheckingUpdate(true);
+        const toastId = toast.loading('Checking for latest updates...');
+        try {
+            const result = await checkAppUpdate(true);
+            setUpdateResult(result);
+            if (result.hasUpdate && result.updateInfo) {
+                toast.success(`New update available: v${result.updateInfo.latestVersion}!`, { id: toastId });
+                setShowUpdateModal(true);
+            } else {
+                toast.success('Your app is up to date (v' + CURRENT_APP_VERSION + ')', { id: toastId });
+            }
+        } catch (e) {
+            toast.error('Could not reach update server', { id: toastId });
+        } finally {
+            setIsCheckingUpdate(false);
+        }
+    };
+
     const tabs = [
         { id: 'profile', label: 'Identity', icon: FaUser },
         { id: 'security', label: 'Security', icon: FaShieldAlt },
         { id: 'language', label: 'Language', icon: FaGlobe },
         { id: 'notifications', label: 'Notifications', icon: FaBell },
+        { id: 'updates', label: 'App Updates', icon: FaRocket },
     ];
 
     return (
@@ -418,10 +443,77 @@ const SettingsPage = () => {
                                     </div>
                                 </div>
                             )}
+
+                            {activeTab === 'updates' && (
+                                <div className="space-y-8 max-w-2xl">
+                                    <div className="p-8 bg-ivory-subtle rounded-3xl border border-royal-gold/10 relative overflow-hidden">
+                                        <div className="flex items-start justify-between">
+                                            <div className="space-y-2">
+                                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-royal-gold/15 text-royal-gold text-[10px] font-black uppercase tracking-widest">
+                                                    <span>Installed Version</span>
+                                                </div>
+                                                <h3 className="text-2xl font-black text-[var(--text-main)]">
+                                                    v{CURRENT_APP_VERSION}
+                                                </h3>
+                                                <p className="text-xs text-[var(--text-muted)]">
+                                                    Find Your Painter Engine • Production Release
+                                                </p>
+                                            </div>
+                                            <div className="w-14 h-14 rounded-2xl bg-navy-deep text-royal-gold flex items-center justify-center shadow-xl">
+                                                <FaRocket size={24} />
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-8 pt-6 border-t border-royal-gold/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                            <div className="text-xs text-[var(--text-muted)] font-medium">
+                                                <span>OTA Update Signal: </span>
+                                                <span className="text-emerald-500 font-bold">Active & Online</span>
+                                            </div>
+                                            <button
+                                                onClick={handleManualUpdateCheck}
+                                                disabled={isCheckingUpdate}
+                                                className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-navy-deep text-royal-gold hover:bg-navy-light font-black text-xs uppercase tracking-widest shadow-lg shadow-navy-deep/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                                            >
+                                                <FaSyncAlt className={isCheckingUpdate ? 'animate-spin' : ''} />
+                                                <span>{isCheckingUpdate ? 'Checking...' : 'Check for Updates'}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Direct Android APK download card */}
+                                    <div className="p-6 bg-gradient-to-br from-navy-deep to-[#111c35] text-white rounded-3xl border border-royal-gold/20 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+                                                <FaAndroid size={24} />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-black uppercase tracking-wider text-white">Android Native Package (APK)</h4>
+                                                <p className="text-[10px] text-slate-300">Download the direct APK installer for offline deployment</p>
+                                            </div>
+                                        </div>
+                                        <a
+                                            href="https://github.com/itsarunkumarx/find-your-painter/releases/latest"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-5 py-3 rounded-xl bg-royal-gold text-navy-deep font-black text-xs uppercase tracking-wider hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shrink-0"
+                                        >
+                                            <FaDownload />
+                                            <span>Download APK</span>
+                                        </a>
+                                    </div>
+                                </div>
+                            )}
                         </motion.div>
                     </AnimatePresence>
                 </div>
             </div>
+
+            {/* In-app update modal */}
+            <UpdateModal
+                isOpen={showUpdateModal}
+                onClose={() => setShowUpdateModal(false)}
+                updateInfo={updateResult?.updateInfo}
+            />
         </div>
     );
 };
