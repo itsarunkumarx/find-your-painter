@@ -194,7 +194,8 @@ const CallOverlay = ({ call, status, onHangUp, onToggleMute, onToggleVideo, isMu
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[99999] bg-navy-deep/95 backdrop-blur-3xl flex flex-col items-center justify-center p-6 text-white"
+            onClick={handleUnlockAudio}
+            className="fixed inset-0 z-[99999] bg-navy-deep/95 backdrop-blur-3xl flex flex-col items-center justify-between p-6 text-white select-none cursor-pointer"
         >
             {/* Background decoration */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
@@ -258,58 +259,69 @@ const CallOverlay = ({ call, status, onHangUp, onToggleMute, onToggleVideo, isMu
                 )}
             </AnimatePresence>
 
-            {/* ── Avatar + status ────────────────────────────────────────────── */}
-            <div className="relative z-10 flex flex-col items-center max-w-md w-full">
-                <motion.div
-                    animate={isTerminated ? { scale: [1, 0.95, 1] } : { scale: [1, 1.05, 1], rotate: [0, 2, -2, 0] }}
-                    transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
-                    className="relative"
-                >
-                    <div className={`w-32 h-32 sm:w-48 sm:h-48 rounded-[2.5rem] bg-gradient-to-br ${isTerminated ? 'from-red-500' : 'from-royal-gold'} to-navy-deep p-[2px] shadow-2xl transition-colors duration-1000`}>
-                        <div className="w-full h-full rounded-[2.4rem] bg-navy-deep flex items-center justify-center overflow-hidden">
-                            {call?.contact?.profileImage ? (
-                                <img
-                                    src={call.contact.profileImage}
-                                    alt={call.contact.name}
-                                    className={`w-full h-full object-cover transition-all duration-1000 ${isTerminated ? 'grayscale' : ''}`}
-                                />
-                            ) : (
-                                <span className={`text-4xl sm:text-6xl font-black transition-colors duration-1000 ${isTerminated ? 'text-red-500' : 'text-royal-gold'}`}>
-                                    {call?.contact?.name?.charAt(0)?.toUpperCase()}
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                    {!isTerminated && (call?.remoteStream ? [1, 2] : [1, 2, 3, 4, 5]).map(i => (
-                        <motion.div
-                            key={i}
-                            initial={{ opacity: 0.8, scale: 1 }}
-                            animate={{ opacity: 0, scale: call?.remoteStream ? 2 : 2.5 }}
-                            transition={{ 
-                                repeat: Infinity, 
-                                duration: call?.remoteStream ? 3 : 1.5, 
-                                delay: i * (call?.remoteStream ? 1.5 : 0.3),
-                                ease: "easeOut"
-                            }}
-                            className={`absolute inset-0 rounded-[2.5rem] border ${call?.remoteStream ? 'border-royal-gold/20' : 'border-royal-gold/60'} pointer-events-none`}
-                        />
-                    ))}
-                </motion.div>
-
-                <div className="mt-10 text-center px-4">
-                    <div className={`text-[10px] font-black uppercase tracking-[0.6em] mb-4 transition-colors duration-1000 ${isTerminated ? 'text-red-500' : 'text-royal-gold'}`}>
-                        {isTerminated ? 'Status: Terminated' : (call?.remoteStream ? '🔴 Live Session' : 'Encrypted Connection')}
-                    </div>
-                    <h2 className="text-3xl sm:text-5xl font-black tracking-tight mb-6">{call?.contact?.name}</h2>
-                    <motion.p 
-                        animate={(!call?.remoteStream && !isTerminated) ? { opacity: [1, 0.4, 1] } : {}}
-                        transition={{ repeat: Infinity, duration: 1.5 }}
-                        className={`text-lg font-bold uppercase tracking-[0.3em] leading-relaxed transition-colors duration-1000 ${isTerminated ? 'text-red-400' : 'text-white/60'}`}
+            {/* ── Avatar + status (Shown on Voice calls or when Video is connecting/terminated) ────────────────── */}
+            {(!isVideo || !call?.remoteStream || isTerminated) && (
+                <div className="relative z-10 flex flex-col items-center max-w-md w-full my-auto">
+                    <motion.div
+                        animate={isTerminated ? { scale: [1, 0.95, 1] } : { scale: [1, 1.05, 1], rotate: [0, 2, -2, 0] }}
+                        transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
+                        className="relative"
                     >
-                        {getStatusText()}
-                    </motion.p>
+                        <div className={`w-32 h-32 sm:w-48 sm:h-48 rounded-[2.5rem] bg-gradient-to-br ${isTerminated ? 'from-red-500' : 'from-royal-gold'} to-navy-deep p-[2px] shadow-2xl transition-colors duration-1000`}>
+                            <div className="w-full h-full rounded-[2.4rem] bg-navy-deep flex items-center justify-center overflow-hidden">
+                                {call?.contact?.profileImage ? (
+                                    <img
+                                        src={call.contact.profileImage}
+                                        alt={call.contact.name}
+                                        className={`w-full h-full object-cover transition-all duration-1000 ${isTerminated ? 'grayscale' : ''}`}
+                                    />
+                                ) : (
+                                    <span className={`text-4xl sm:text-6xl font-black transition-colors duration-1000 ${isTerminated ? 'text-red-500' : 'text-royal-gold'}`}>
+                                        {call?.contact?.name?.charAt(0)?.toUpperCase()}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        {!isTerminated && (call?.remoteStream ? [1, 2] : [1, 2, 3, 4, 5]).map(i => (
+                            <motion.div
+                                key={i}
+                                initial={{ opacity: 0.8, scale: 1 }}
+                                animate={{ opacity: 0, scale: call?.remoteStream ? 2 : 2.5 }}
+                                transition={{ 
+                                    repeat: Infinity, 
+                                    duration: call?.remoteStream ? 3 : 1.5, 
+                                    delay: i * (call?.remoteStream ? 1.5 : 0.3),
+                                    ease: "easeOut"
+                                }}
+                                className={`absolute inset-0 rounded-[2.5rem] border ${call?.remoteStream ? 'border-royal-gold/20' : 'border-royal-gold/60'} pointer-events-none`}
+                            />
+                        ))}
+                    </motion.div>
+
+                    <div className="mt-10 text-center px-4">
+                        <div className={`text-[10px] font-black uppercase tracking-[0.6em] mb-4 transition-colors duration-1000 ${isTerminated ? 'text-red-500' : 'text-royal-gold'}`}>
+                            {isTerminated ? 'Status: Terminated' : (call?.remoteStream ? '🔴 Live Session' : 'Encrypted Connection')}
+                        </div>
+                        <h2 className="text-3xl sm:text-5xl font-black tracking-tight mb-6">{call?.contact?.name}</h2>
+                        <motion.p 
+                            animate={(!call?.remoteStream && !isTerminated) ? { opacity: [1, 0.4, 1] } : {}}
+                            transition={{ repeat: Infinity, duration: 1.5 }}
+                            className={`text-lg font-bold uppercase tracking-[0.3em] leading-relaxed transition-colors duration-1000 ${isTerminated ? 'text-red-400' : 'text-white/60'}`}
+                        >
+                            {getStatusText()}
+                        </motion.p>
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {/* ── Floating Header for Active Video Calls ──────────────────────── */}
+            {isVideo && call?.remoteStream && !isTerminated && (
+                <div className="absolute top-6 inset-x-0 mx-auto w-fit z-30 px-6 py-2.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 shadow-2xl flex items-center gap-4">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-xs font-black tracking-wider text-white uppercase">{call?.contact?.name}</span>
+                    <span className="text-xs font-mono font-bold text-royal-gold">{duration}</span>
+                </div>
+            )}
 
             {/* ── Controls ───────────────────────────────────────────────────── */}
             {!isTerminated && (
