@@ -78,8 +78,16 @@ const App = () => {
   const normalizedPath = decodeURIComponent(location.pathname).toLowerCase();
   const isDashboard = DASHBOARD_ROUTES.some(r => normalizedPath.startsWith(r.toLowerCase()));
 
-  // Silent update check 3s after launch
+  // Silent update check 3s after launch - ONLY for Native Android App (Never on website)
   useEffect(() => {
+    const isNativeAndroid = typeof window !== 'undefined' && (
+      window.Capacitor?.isNativePlatform?.() || 
+      window.location.protocol === 'capacitor:'
+    );
+
+    // If on web browser, do not show update modal
+    if (!isNativeAndroid) return;
+
     const timer = setTimeout(async () => {
       const result = await checkAppUpdate(false);
       if (result.hasUpdate && result.updateInfo) {

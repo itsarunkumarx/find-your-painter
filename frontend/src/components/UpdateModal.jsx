@@ -44,6 +44,9 @@ const UpdateModal = ({ isOpen, onClose, updateInfo }) => {
                 setProgress(100);
 
                 if (isNativeAndroid) {
+                    // Record dismissal so it doesn't loop
+                    dismissUpdate(updateInfo.latestVersion);
+
                     // Trigger direct APK download or redirect to release page
                     const downloadUrl = updateInfo.downloadUrl || 'https://github.com/itsarunkumarx/find-your-painter/releases/latest';
                     toast.success('Downloading latest Android APK...', { icon: '📥' });
@@ -63,6 +66,7 @@ const UpdateModal = ({ isOpen, onClose, updateInfo }) => {
                         onClose();
                     }, 2000);
                 } else {
+                    dismissUpdate(updateInfo.latestVersion);
                     // For Web/PWA: unregister old service workers and reload
                     toast.success('Updating web app to latest version...', { icon: '⚡' });
                     if ('serviceWorker' in navigator) {

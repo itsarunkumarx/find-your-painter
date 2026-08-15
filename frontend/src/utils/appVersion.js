@@ -1,8 +1,8 @@
 import api from './api';
 import safeStorage from './safeStorage';
 
-export const CURRENT_APP_VERSION = '1.2.0';
-export const CURRENT_VERSION_CODE = 2;
+export const CURRENT_APP_VERSION = '1.3.0';
+export const CURRENT_VERSION_CODE = 3;
 
 // Semantic version comparison: returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal
 export const compareVersions = (v1, v2) => {
