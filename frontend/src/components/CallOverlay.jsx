@@ -1,50 +1,78 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaPhoneSlash, FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaVolumeMute, FaRandom, FaVolumeUp } from 'react-icons/fa';
+import { 
+    FaPhoneSlash, 
+    FaMicrophone, 
+    FaMicrophoneSlash, 
+    FaVideo, 
+    FaVideoSlash, 
+    FaRandom, 
+    FaVolumeUp,
+    FaVolumeMute,
+    FaExpand,
+    FaCompress
+} from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
-const CallOverlay = ({ call, status, onHangUp, onToggleMute, onToggleVideo, isMuted, isVideoOff, isAudioBlocked, onTransfer }) => {
+const CallOverlay = ({ 
+    call, 
+    status, 
+    onHangUp, 
+    onToggleMute, 
+    onToggleVideo, 
+    isMuted, 
+    isVideoOff, 
+    isAudioBlocked, 
+    onTransfer 
+}) => {
     const remoteVideoRef = useRef(null);
     const localVideoRef  = useRef(null);
     const remoteAudioRef = useRef(null);
+    
     const [audioUnlocked, setAudioUnlocked] = useState(false);
     const [audioError, setAudioError] = useState(false);
     const [duration, setDuration] = useState('00:00');
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorderRef = useRef(null);
     const recordedChunksRef = useRef([]);
-    const playAttemptRef = useRef(null);
 
-    // Aggressively attach and play remote audio/video when stream changes
+    const isVideo = call?.type === 'video';
+    const isTerminated = ['busy', 'declined', 'no_answer', 'failed'].includes(status);
+    const isConnected = status === 'connected' || !!call?.remoteStream;
+
+    // Attach and play remote stream immediately
     const attachAndPlay = useCallback(async (stream) => {
         if (!stream) return;
-        console.log('[CallOverlay] Attaching stream:', stream.id, 'Tracks:', stream.getTracks().length);
 
         if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = stream;
-            remoteVideoRef.current.muted = false;
-            remoteVideoRef.current.volume = 1.0;
-            remoteVideoRef.current.play().then(() => {
+            remoteVideoRef.current.playsInline = true;
+            try {
+                remoteVideoRef.current.muted = false;
+                await remoteVideoRef.current.play();
                 setAudioUnlocked(true);
                 setAudioError(false);
-            }).catch((err) => {
-                console.warn('[CallOverlay] Video autoplay:', err.name);
-                if (err.name === 'NotAllowedError') setAudioError(true);
-            });
+            } catch (err) {
+                // If unmuted autoplay blocked by browser policy, play muted and show tap unmute prompt
+                try {
+                    remoteVideoRef.current.muted = true;
+                    await remoteVideoRef.current.play();
+                } catch (e) {}
+                setAudioError(true);
+            }
         }
 
         if (remoteAudioRef.current) {
             remoteAudioRef.current.srcObject = stream;
             remoteAudioRef.current.volume = 1.0;
             remoteAudioRef.current.muted = false;
-            remoteAudioRef.current.play().then(() => {
+            try {
+                await remoteAudioRef.current.play();
                 setAudioUnlocked(true);
                 setAudioError(false);
-            }).catch((err) => {
-                if (err.name === 'NotAllowedError') {
-                    setAudioError(true);
-                }
-            });
+            } catch (err) {
+                setAudioError(true);
+            }
         }
     }, []);
 
@@ -53,58 +81,31 @@ const CallOverlay = ({ call, status, onHangUp, onToggleMute, onToggleVideo, isMu
         if (call?.remoteStream) {
             attachAndPlay(call.remoteStream);
         }
-        return () => {
-            if (playAttemptRef.current) clearTimeout(playAttemptRef.current);
-        };
     }, [call?.remoteStream, attachAndPlay]);
 
-    // Attach local video
+    // Attach local preview stream
     useEffect(() => {
-        if (localVideoRef.current && call?.stream) {
-            localVideoRef.current.srcObject = call.stream;
-        } else if (localVideoRef.current) {
-            localVideoRef.current.srcObject = null;
+        if (localVideoRef.current) {
+            localVideoRef.current.srcObject = call?.stream || null;
         }
     }, [call?.stream]);
 
-    // User manually unlocks audio by clicking the button
-    const handleUnlockAudio = async () => {
+    // Manual audio unlock triggered on screen tap
+    const handleUnlockAudio = useCallback(async () => {
         setAudioError(false);
-        if (remoteAudioRef.current && call?.remoteStream) {
-            remoteAudioRef.current.srcObject = call.remoteStream;
+        setAudioUnlocked(true);
+        if (remoteVideoRef.current) {
+            remoteVideoRef.current.muted = false;
+            remoteVideoRef.current.play().catch(() => {});
+        }
+        if (remoteAudioRef.current) {
             remoteAudioRef.current.muted = false;
-            try {
-                await remoteAudioRef.current.play();
-                setAudioUnlocked(true);
-            } catch (e) {
-                console.error('[CallOverlay] Manual audio unlock failed:', e);
-            }
+            remoteAudioRef.current.volume = 1.0;
+            remoteAudioRef.current.play().catch(() => {});
         }
-    };
+    }, []);
 
-    const isVideo = call?.type === 'video';
-
-    const getStatusText = () => {
-        if (call?.startTime && (status === 'connected' || !status)) return duration;
-        
-        // Return a distinct "Action" status for the main label
-        if (!call?.stream && !isTerminated) return 'Starting Camera...';
-        
-        switch (status) {
-            case 'connecting': return 'Establishing Link...';
-            case 'ringing':    return 'Ringing...';
-            case 'busy':       return 'User is Busy';
-            case 'declined':   return 'Call Declined';
-            case 'no_answer':  return 'No Answer';
-            case 'failed':     return 'Link Failed';
-            case 'connected':  return duration;
-            default: return call?.isRinging ? 'Ringing...' : 'Securing Line...';
-        }
-    };
-
-    // ── Timer Logic ──────────────────────────────────────────────────────────
-    // FIX: Timer runs whenever startTime is set — not gated on status string.
-    // This ensures caller sees the timer as soon as the other person picks up.
+    // Timer calculation
     useEffect(() => {
         if (!call?.startTime) return;
 
@@ -116,36 +117,41 @@ const CallOverlay = ({ call, status, onHangUp, onToggleMute, onToggleVideo, isMu
         };
 
         const interval = setInterval(updateTimer, 1000);
-        updateTimer(); // run immediately so 00:00 shows at once
+        updateTimer();
         return () => clearInterval(interval);
     }, [call?.startTime]);
 
-    // ── Recording Logic ──────────────────────────────────────────────────────
-    const startRecording = async () => {
+    // Recording handler
+    const toggleRecording = async () => {
+        if (isRecording) {
+            if (mediaRecorderRef.current) {
+                mediaRecorderRef.current.stop();
+                setIsRecording(false);
+            }
+            return;
+        }
+
         if (!call?.stream || !call?.remoteStream) {
-            toast.error('Streams not ready for recording');
+            toast.error('Streams not active');
             return;
         }
 
         try {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             const dest = audioCtx.createMediaStreamDestination();
-
-            // Mix local and remote audio
             const localSource = audioCtx.createMediaStreamSource(call.stream);
             const remoteSource = audioCtx.createMediaStreamSource(call.remoteStream);
-            
             localSource.connect(dest);
             remoteSource.connect(dest);
 
             const combinedStream = new MediaStream([
                 ...dest.stream.getTracks(),
-                ...(call.type === 'video' ? call.remoteStream.getVideoTracks() : [])
+                ...(isVideo ? call.remoteStream.getVideoTracks() : [])
             ]);
 
             const recorder = new MediaRecorder(combinedStream, {
-                mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') 
-                    ? 'video/webm;codecs=vp9,opus' 
+                mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+                    ? 'video/webm;codecs=vp9,opus'
                     : 'video/webm'
             });
 
@@ -160,14 +166,14 @@ const CallOverlay = ({ call, status, onHangUp, onToggleMute, onToggleVideo, isMu
                 const a = document.createElement('a');
                 a.style.display = 'none';
                 a.href = url;
-                a.download = `call_recording_${new Date().toISOString()}.webm`;
+                a.download = `call_${Date.now()}.webm`;
                 document.body.appendChild(a);
                 a.click();
                 setTimeout(() => {
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
                 }, 100);
-                toast.success('Recording saved successfully');
+                toast.success('Recording saved');
             };
 
             recorder.start();
@@ -175,19 +181,22 @@ const CallOverlay = ({ call, status, onHangUp, onToggleMute, onToggleVideo, isMu
             setIsRecording(true);
             toast.success('Recording started');
         } catch (err) {
-            console.error('[Recording] Failed to start:', err);
-            toast.error('Could not start recording');
+            toast.error('Recording failed');
         }
     };
 
-    const stopRecording = () => {
-        if (mediaRecorderRef.current && isRecording) {
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
+    const getStatusText = () => {
+        if (isTerminated) return 'Call Ended';
+        if (isConnected) return duration;
+        switch (status) {
+            case 'connecting': return 'Connecting...';
+            case 'ringing':    return 'Ringing...';
+            case 'busy':       return 'User Busy';
+            case 'declined':   return 'Declined';
+            case 'no_answer':  return 'No Answer';
+            default:           return call?.isRinging ? 'Ringing...' : 'Securing Line...';
         }
     };
-
-    const isTerminated = ['busy', 'declined', 'no_answer', 'failed'].includes(status);
 
     return (
         <motion.div
@@ -195,232 +204,196 @@ const CallOverlay = ({ call, status, onHangUp, onToggleMute, onToggleVideo, isMu
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleUnlockAudio}
-            className="fixed inset-0 z-[99999] bg-navy-deep/95 backdrop-blur-3xl flex flex-col items-center justify-between p-6 text-white select-none cursor-pointer"
+            className="fixed inset-0 z-[99999] bg-[#070b14] text-white flex flex-col justify-between overflow-hidden select-none"
         >
-            {/* Background decoration */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
-                <div className={`absolute -top-[10%] -left-[10%] w-[40%] h-[40%] ${isTerminated ? 'bg-red-500' : 'bg-royal-gold'} rounded-full blur-[120px] transition-colors duration-1000`} />
-                <div className={`absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] ${isTerminated ? 'bg-red-500' : 'bg-royal-gold'} rounded-full blur-[120px] transition-colors duration-1000`} />
-            </div>
-
-            {/* ── Video streams (video calls only) ──────────────────────────── */}
-            <AnimatePresence>
-                {isVideo && !isTerminated && (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="absolute inset-0 w-full h-full flex items-center justify-center p-0 sm:p-10"
-                    >
-                        <div className="relative w-full h-full sm:max-w-5xl sm:rounded-[2.5rem] overflow-hidden bg-black/40 border border-white/10 shadow-2xl flex flex-col sm:block">
-                            {/* Remote video */}
-                            <video
-                                ref={remoteVideoRef}
-                                autoPlay
-                                playsInline
-                                className="w-full h-3/5 sm:h-full object-cover"
-                            />
-
-                            {/* Local preview (PiP on desktop, bottom strip on mobile portrait) */}
+            {/* ── 1. FULLSCREEN REMOTE VIDEO (VIDEO CALLS) ────────────────── */}
+            {isVideo && !isTerminated && (
+                <div className="absolute inset-0 w-full h-full bg-black z-0 flex items-center justify-center">
+                    <video
+                        ref={remoteVideoRef}
+                        autoPlay
+                        playsInline
+                        webkit-playsinline="true"
+                        x5-playsinline="true"
+                        className="w-full h-full object-cover"
+                    />
+                    {/* Placeholder when remote camera is still connecting */}
+                    {!call?.remoteStream && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-navy-deep/90 gap-4">
                             <motion.div
-                                drag={!window.matchMedia('(max-width: 640px) and (orientation: portrait)').matches}
-                                dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-                                className="absolute bottom-6 right-6 w-32 h-48 sm:w-48 sm:h-64 rounded-2xl overflow-hidden border-2 border-white/20 shadow-xl bg-black cursor-move
-                                    max-sm:relative max-sm:bottom-0 max-sm:right-0 max-sm:w-full max-sm:h-2/5 max-sm:rounded-none max-sm:border-0"
-                            >
-                                <video
-                                    ref={localVideoRef}
-                                    autoPlay
-                                    playsInline
-                                    muted
-                                    className={`w-full h-full object-cover ${(isVideoOff || !call?.stream) ? 'hidden' : 'block'}`}
-                                />
-                                {(isVideoOff || !call?.stream) && (
-                                    <div className="w-full h-full flex flex-col items-center justify-center bg-navy-deep gap-3 p-4 text-center">
-                                        {isVideoOff ? (
-                                            <FaVideoSlash className="text-white/20 text-3xl" />
-                                        ) : (
-                                            <>
-                                                <motion.div
-                                                    animate={{ rotate: 360 }}
-                                                    transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                                                    className="w-10 h-10 border-2 border-royal-gold/20 border-t-royal-gold rounded-full"
-                                                />
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-royal-gold/60">
-                                                    Starting Camera...
-                                                </span>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
-                            </motion.div>
+                                animate={{ rotate: 360 }}
+                                transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                                className="w-12 h-12 border-3 border-royal-gold/20 border-t-royal-gold rounded-full"
+                            />
+                            <p className="text-xs font-black uppercase tracking-widest text-royal-gold/70">
+                                Connecting Camera...
+                            </p>
                         </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                    )}
+                </div>
+            )}
 
-            {/* ── Avatar + status (Shown on Voice calls or when Video is connecting/terminated) ────────────────── */}
-            {(!isVideo || !call?.remoteStream || isTerminated) && (
-                <div className="relative z-10 flex flex-col items-center max-w-md w-full my-auto">
-                    <motion.div
-                        animate={isTerminated ? { scale: [1, 0.95, 1] } : { scale: [1, 1.05, 1], rotate: [0, 2, -2, 0] }}
-                        transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
-                        className="relative"
-                    >
-                        <div className={`w-32 h-32 sm:w-48 sm:h-48 rounded-[2.5rem] bg-gradient-to-br ${isTerminated ? 'from-red-500' : 'from-royal-gold'} to-navy-deep p-[2px] shadow-2xl transition-colors duration-1000`}>
-                            <div className="w-full h-full rounded-[2.4rem] bg-navy-deep flex items-center justify-center overflow-hidden">
+            {/* ── 2. LOCAL PREVIEW PIP (FLOATING CORNER) ────────────────────── */}
+            {isVideo && !isTerminated && call?.stream && (
+                <motion.div
+                    drag
+                    dragConstraints={{ left: -100, right: 100, top: -200, bottom: 200 }}
+                    className="absolute top-20 right-4 z-20 w-28 h-40 sm:w-40 sm:h-56 rounded-2xl overflow-hidden border-2 border-royal-gold/40 shadow-2xl bg-black/80 backdrop-blur-md cursor-grab active:cursor-grabbing"
+                >
+                    <video
+                        ref={localVideoRef}
+                        autoPlay
+                        playsInline
+                        webkit-playsinline="true"
+                        x5-playsinline="true"
+                        muted
+                        className={`w-full h-full object-cover ${isVideoOff ? 'hidden' : 'block'}`}
+                    />
+                    {isVideoOff && (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-navy-deep p-2 text-center">
+                            <FaVideoSlash className="text-white/40 text-xl mb-1" />
+                            <span className="text-[9px] font-black uppercase text-slate-400">Camera Off</span>
+                        </div>
+                    )}
+                </motion.div>
+            )}
+
+            {/* ── 3. VOICE CALL AVATAR VIEW (WHEN NOT IN ACTIVE VIDEO) ─────── */}
+            {(!isVideo || isTerminated || !call?.remoteStream) && (
+                <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 text-center">
+                    {/* Pulsing ambient rings */}
+                    <div className="relative mb-8">
+                        <div className={`w-36 h-36 sm:w-48 sm:h-48 rounded-full bg-gradient-to-tr ${isTerminated ? 'from-red-500' : 'from-royal-gold'} to-navy-light p-1 shadow-2xl flex items-center justify-center`}>
+                            <div className="w-full h-full rounded-full bg-navy-deep flex items-center justify-center overflow-hidden">
                                 {call?.contact?.profileImage ? (
                                     <img
                                         src={call.contact.profileImage}
                                         alt={call.contact.name}
-                                        className={`w-full h-full object-cover transition-all duration-1000 ${isTerminated ? 'grayscale' : ''}`}
+                                        className={`w-full h-full object-cover ${isTerminated ? 'grayscale' : ''}`}
                                     />
                                 ) : (
-                                    <span className={`text-4xl sm:text-6xl font-black transition-colors duration-1000 ${isTerminated ? 'text-red-500' : 'text-royal-gold'}`}>
-                                        {call?.contact?.name?.charAt(0)?.toUpperCase()}
+                                    <span className="text-4xl sm:text-6xl font-black text-royal-gold">
+                                        {call?.contact?.name?.charAt(0)?.toUpperCase() || 'P'}
                                     </span>
                                 )}
                             </div>
                         </div>
-                        {!isTerminated && (call?.remoteStream ? [1, 2] : [1, 2, 3, 4, 5]).map(i => (
+
+                        {!isTerminated && [1, 2, 3].map((ring) => (
                             <motion.div
-                                key={i}
-                                initial={{ opacity: 0.8, scale: 1 }}
-                                animate={{ opacity: 0, scale: call?.remoteStream ? 2 : 2.5 }}
-                                transition={{ 
-                                    repeat: Infinity, 
-                                    duration: call?.remoteStream ? 3 : 1.5, 
-                                    delay: i * (call?.remoteStream ? 1.5 : 0.3),
-                                    ease: "easeOut"
-                                }}
-                                className={`absolute inset-0 rounded-[2.5rem] border ${call?.remoteStream ? 'border-royal-gold/20' : 'border-royal-gold/60'} pointer-events-none`}
+                                key={ring}
+                                initial={{ opacity: 0.6, scale: 1 }}
+                                animate={{ opacity: 0, scale: 2.2 }}
+                                transition={{ repeat: Infinity, duration: 2, delay: ring * 0.6, ease: "easeOut" }}
+                                className="absolute inset-0 rounded-full border border-royal-gold/40 pointer-events-none"
                             />
                         ))}
-                    </motion.div>
-
-                    <div className="mt-10 text-center px-4">
-                        <div className={`text-[10px] font-black uppercase tracking-[0.6em] mb-4 transition-colors duration-1000 ${isTerminated ? 'text-red-500' : 'text-royal-gold'}`}>
-                            {isTerminated ? 'Status: Terminated' : (call?.remoteStream ? '🔴 Live Session' : 'Encrypted Connection')}
-                        </div>
-                        <h2 className="text-3xl sm:text-5xl font-black tracking-tight mb-6">{call?.contact?.name}</h2>
-                        <motion.p 
-                            animate={(!call?.remoteStream && !isTerminated) ? { opacity: [1, 0.4, 1] } : {}}
-                            transition={{ repeat: Infinity, duration: 1.5 }}
-                            className={`text-lg font-bold uppercase tracking-[0.3em] leading-relaxed transition-colors duration-1000 ${isTerminated ? 'text-red-400' : 'text-white/60'}`}
-                        >
-                            {getStatusText()}
-                        </motion.p>
                     </div>
+
+                    <h2 className="text-2xl sm:text-4xl font-black tracking-tight mb-2">
+                        {call?.contact?.name || 'Painter'}
+                    </h2>
+                    <p className={`text-sm font-bold uppercase tracking-widest ${isTerminated ? 'text-red-400' : 'text-royal-gold'}`}>
+                        {getStatusText()}
+                    </p>
                 </div>
             )}
 
-            {/* ── Floating Header for Active Video Calls ──────────────────────── */}
-            {isVideo && call?.remoteStream && !isTerminated && (
-                <div className="absolute top-6 inset-x-0 mx-auto w-fit z-30 px-6 py-2.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 shadow-2xl flex items-center gap-4">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-                    <span className="text-xs font-black tracking-wider text-white uppercase">{call?.contact?.name}</span>
-                    <span className="text-xs font-mono font-bold text-royal-gold">{duration}</span>
-                </div>
-            )}
-
-            {/* ── Controls ───────────────────────────────────────────────────── */}
-            {!isTerminated && (
-                <div className="mt-auto relative z-20 pb-10 flex items-center gap-4 sm:gap-6 max-sm:scale-125 max-sm:pb-16">
-                    <button
-                        onClick={onToggleMute}
-                        className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center transition-all ${isMuted ? 'bg-white text-navy-deep' : 'bg-white/10 text-white hover:bg-white/20'}`}
-                        title="Mute / Unmute"
-                    >
-                        {isMuted ? <FaMicrophoneSlash size={20} /> : <FaMicrophone size={20} />}
-                    </button>
-
-                    {/* Recording Button */}
-                    <button
-                        onClick={isRecording ? stopRecording : startRecording}
-                        className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-white/10 text-white hover:bg-white/20'}`}
-                        title={isRecording ? 'Stop Recording' : 'Start Recording'}
-                    >
-                        <div className={`w-3 h-3 rounded-full ${isRecording ? 'bg-white' : 'bg-red-500'}`} />
-                    </button>
-
-                    {onTransfer && (
-                        <button
-                            onClick={onTransfer}
-                            className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/10 text-white hover:bg-royal-gold/30 hover:text-royal-gold flex items-center justify-center transition-all"
-                            title="Transfer Call"
-                        >
-                            <FaRandom size={16} />
-                        </button>
-                    )}
-
-                    <button
-                        onClick={onHangUp}
-                        className="w-16 h-16 sm:w-20 sm:h-20 bg-red-500 hover:bg-red-600 rounded-[2rem] flex items-center justify-center transition-all shadow-xl shadow-red-500/20"
-                        title="End Call"
-                    >
-                        <FaPhoneSlash size={24} className="rotate-[135deg]" />
-                    </button>
-
-                    <button
-                        onClick={onToggleVideo}
-                        className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center transition-all ${isVideoOff ? 'bg-white text-navy-deep' : 'bg-white/10 text-white hover:bg-white/20'}`}
-                        title="Toggle Video"
-                    >
-                        {isVideoOff ? <FaVideoSlash size={20} /> : <FaVideo size={20} />}
-                    </button>
-                </div>
-            )}
-
-            {/* ── Top-left status ─────────────────────────────────────────────── */}
-            <div className="absolute top-10 left-10 flex flex-col gap-2">
-                <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-royal-gold rounded-full animate-ping" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">
+            {/* ── 4. FLOATING TOP BAR ────────────────────────────────────────── */}
+            <div className="relative z-30 pt-6 px-6 flex items-center justify-between w-full pointer-events-none">
+                <div className="flex items-center gap-3 bg-black/60 backdrop-blur-xl px-4 py-2 rounded-full border border-white/10">
+                    <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-royal-gold animate-ping'}`} />
+                    <span className="text-xs font-black uppercase tracking-widest text-white">
                         {isVideo ? 'Video Call' : 'Voice Call'}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-royal-gold ml-2">
+                        {getStatusText()}
                     </span>
                 </div>
 
-                {/* Audio unlock button — shows when autoplay is blocked */}
+                {/* Audio Unblock Notification Prompt */}
                 {audioError && (
                     <motion.button
-                        initial={{ x: -20, opacity: 0 }}
-                        animate={{ x: 0, opacity: 1 }}
+                        initial={{ scale: 0.9 }}
+                        animate={{ scale: [1, 1.05, 1] }}
+                        transition={{ repeat: Infinity, duration: 1.5 }}
                         onClick={handleUnlockAudio}
-                        className="flex items-center gap-2 bg-royal-gold/20 border border-royal-gold/40 px-3 py-1.5 rounded-full hover:bg-royal-gold/30 transition-colors"
+                        className="pointer-events-auto flex items-center gap-2 bg-royal-gold text-navy-deep px-4 py-2 rounded-full font-black text-xs uppercase tracking-wider shadow-lg shadow-royal-gold/30 hover:brightness-110"
                     >
-                        <FaVolumeUp className="text-royal-gold animate-pulse text-xs" />
-                        <span className="text-[9px] font-black uppercase tracking-wider text-royal-gold">
-                            Tap to hear audio
-                        </span>
+                        <FaVolumeUp className="text-sm" />
+                        <span>Tap to Unmute</span>
                     </motion.button>
                 )}
             </div>
 
-            {/*
-             * CRITICAL: Separate <audio> element for remote audio.
-             * The <video> element is muted to allow autoplay (browser policy).
-             * Real audio plays through this dedicated element.
-             * autoPlay + playsInline ensures browser attempts audio immediately.
-             */}
-            {/*
-             * CRITICAL: Dedicated <audio> for remote caller audio.
-             * The <video> is muted (browser policy). Real audio plays here.
-             * onCanPlay + autoPlay gives two chances to start audio immediately.
-             */}
+            {/* ── 5. BOTTOM CONTROL DOCK ────────────────────────────────────── */}
+            {!isTerminated && (
+                <div className="relative z-30 pb-10 px-6 flex items-center justify-center">
+                    <div className="flex items-center gap-3 sm:gap-5 bg-navy-deep/80 backdrop-blur-2xl px-6 py-4 rounded-3xl border border-white/10 shadow-2xl max-w-full overflow-x-auto">
+                        {/* Mic Mute Button */}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
+                            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${
+                                isMuted ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-white/10 text-white hover:bg-white/20'
+                            }`}
+                            title="Mute/Unmute Mic"
+                        >
+                            {isMuted ? <FaMicrophoneSlash size={18} /> : <FaMicrophone size={18} />}
+                        </button>
+
+                        {/* Video Toggle (Video Calls only) */}
+                        {isVideo && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onToggleVideo(); }}
+                                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${
+                                    isVideoOff ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-white/10 text-white hover:bg-white/20'
+                                }`}
+                                title="Toggle Video"
+                            >
+                                {isVideoOff ? <FaVideoSlash size={18} /> : <FaVideo size={18} />}
+                            </button>
+                        )}
+
+                        {/* Call Recording */}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); toggleRecording(); }}
+                            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${
+                                isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-white/10 text-white hover:bg-white/20'
+                            }`}
+                            title={isRecording ? 'Stop Recording' : 'Record Call'}
+                        >
+                            <div className={`w-3.5 h-3.5 rounded-full ${isRecording ? 'bg-white' : 'bg-red-500'}`} />
+                        </button>
+
+                        {/* Call Transfer */}
+                        {onTransfer && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onTransfer(); }}
+                                className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/10 text-white hover:bg-royal-gold/30 hover:text-royal-gold flex items-center justify-center transition-all"
+                                title="Transfer Call"
+                            >
+                                <FaRandom size={16} />
+                            </button>
+                        )}
+
+                        {/* End Call Button */}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onHangUp(); }}
+                            className="w-14 h-14 sm:w-16 sm:h-16 bg-red-600 hover:bg-red-700 active:scale-95 rounded-2xl flex items-center justify-center transition-all shadow-xl shadow-red-600/40 text-white"
+                            title="End Call"
+                        >
+                            <FaPhoneSlash size={22} className="rotate-[135deg]" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── DEDICATED REMOTE AUDIO ELEMENT ────────────────────────────── */}
             <audio
                 ref={remoteAudioRef}
                 autoPlay
                 playsInline
                 className="hidden"
-                onCanPlay={() => {
-                    if (remoteAudioRef.current) {
-                        remoteAudioRef.current.muted = false;
-                        remoteAudioRef.current.volume = 1.0;
-                        remoteAudioRef.current.play().catch(e => {
-                            if (e.name === 'NotAllowedError') setAudioError(true);
-                        });
-                    }
-                }}
                 onPlay={() => { setAudioUnlocked(true); setAudioError(false); }}
             />
         </motion.div>
